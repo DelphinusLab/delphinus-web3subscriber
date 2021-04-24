@@ -1,0 +1,23 @@
+{
+  "name": "web3subscriber",
+  "version": "1.0.0",
+  "description": "a web3 subscriber for easy truffle based projects",
+  "main": "syncdb.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoyoeproject/web3subscriber.git"
+  },
+  "keywords": [
+    "web3",
+    "subscriber"
+  ],
+  "author": "xin gao",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zoyoeproject/web3subscriber/issues"
+  },
+  "homepage": "https://github.com/zoyoeproject/web3subscriber#readme"
+}
