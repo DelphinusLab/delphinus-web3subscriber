@@ -6,10 +6,10 @@ function get_abi_events(api_file) {
   let abi_data = FileSys.readFileSync(api_file);
   let data_json = JSON.parse(abi_data);
   let abi_json = data_json.abi;
-  let events = [];
+  let events = {};
   abi_json.forEach(t => {
     if (t.type=="event") {
-      events.push(t);
+      events[t.name] = t;
     }
   });
   return events;
@@ -27,24 +27,32 @@ async function get_info_collection(db) {
   }
 }
 
-function create_collection(db, event_name) {
-  db.db().createCollection(event_name, function(err, res) {
-    if (err) throw err;
-    console.log("Collection " + event_name + " created!");
-  });
+async function query_event_collection(db, event_name) {
+  let collections = await db.listCollections({name:event_name}).toArray();
+  if (collections.length == 0) {
+    console.log("Init collection: ", event_name);
+    let c = await db.createCollection(event_name);
+    return c;
+  } else {
+    let c = db.collection(event_name);
+    return c;
+  }
 }
 
-async function get_last_monitor_block(info_collection, event) {
-  let rs = await info_collection.find({name:event.name}).toArray();
-  if (rs.length == 0) {console.log("create collection  %s!", event.name);return 0;}
+
+
+async function get_last_monitor_block(info_collection) {
+  let rs = await info_collection.find({name:"LastUpdatedBlock"}).toArray();
+  if (rs.length == 0) {return 0;}
   else {
     console.log(rs[0]);
     return(rs[0].lastblock);
   }
 }
 
-async function update_last_monitor_block(info_collection, event, r) {
-  let result = await info_collection.updateOne({name:event.name},
+async function update_last_monitor_block(info_collection, events, r) {
+  let event = events[r.event];
+  let result = await info_collection.updateOne({name:"LastUpdatedBlock"},
     {$set:{lastblock:r.blockNumber}},
     {upsert:true});
   let v = {};
@@ -77,72 +85,56 @@ class EventTracker {
     this.handlers = handlers;
   }
 
-  async record_event (db, event) {
+  async sync_past_events(db) {
     let info_collection = await get_info_collection(db);
-    let lastblock = await get_last_monitor_block(info_collection, event);
+    let lastblock = await get_last_monitor_block(info_collection);
     console.log ("monitor %s from %s", event.name, lastblock);
-    let past_events = await this.contract.getPastEvents(event.name, {
+    let past_events = await this.contract.getPastEvents("allEvents", {
         fromBlock:lastblock, toBlock:"latest"
     });
     return await foldM (past_events, [], async (acc, r) => {
-      let e = await update_last_monitor_block(info_collection, event, r);
+      let e = await update_last_monitor_block(info_collection, this.events, r);
       acc.push(this.handlers(event.name, e));
       return (acc);
     });
   }
 
-  record_events (db) {
-    let es = this.events.map (t => {
-        let event_track = this.record_event (db.db(), t);
-        return event_track;
-    });
-    return es;
-  }
-
-  async subscribe_event (db, event) {
+  async subscribe_event (db) {
     let info_collection = await get_info_collection(db);
-    let lastblock = await get_last_monitor_block(info_collection, event);
-    console.log ("monitor %s from %s", event.name, lastblock);
-    let r = await this.contract.events[event.name](
+    let lastblock = await get_last_monitor_block(info_collection);
+    console.log ("monitor from %s", lastblock);
+    let r = await this.contract.events.allEvents(
         {fromBlock:lastblock}
     );
     r.on("connected", subscribe_id => {
       console.log(subscribe_id);
     })
     .on('data', async (r) => {
-      console.log("subscribe event: %s", event.name);
-      let e = await update_last_monitor_block(info_collection, event, r);
-      this.handlers(event.name, e);
+      console.log("subscribe event: %s", r.event);
+      let e = await update_last_monitor_block(info_collection, this.events, r);
+      this.handlers(r.event, e);
     });
     return true;
   }
 
-  async track_events () {
+  async sync_events () {
     let url = this.config.mongodb_url + "/" + this.address;
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
-    let ps = this.record_events(db);
+    let ps = this.sync_past_events(db);
     return Promise.all(ps);
   }
 
   async subscribe_events () {
     let url = this.config.mongodb_url + "/" + this.address;
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
-    let ps = this.events.map (t => {
-        let event_track = this.subscribe_event (db.db(), t);
-        return event_track;
-    });
-    return Promise.all(ps);
+    this.subscribe_event (db.db());
+    return true;
   }
 
   async reset_events_info (db) {
     let info_collection = await get_info_collection(db);
-    let p = Promise.resolve(1);
-    this.events.forEach(event => {
-        p = p.then (x => info_collection.deleteMany({name:event.name}))
-    });
-    return p;
-    let r = await p;
-    return r;
+    await info_collection.deleteMany({name:"LastUpdatedBlock"});
+    return true;
   }
 
   async reset_events () {
