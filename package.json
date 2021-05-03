@@ -2,7 +2,6 @@
   "name": "web3subscriber",
   "version": "1.0.0",
   "description": "a web3 subscriber for easy truffle based projects",
-  "main": "lib.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
