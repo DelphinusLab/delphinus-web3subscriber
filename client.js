@@ -23,7 +23,7 @@ function getContract(web3, config, contract_info, account) {
   return contract;
 }
 
-async function getBalance(token) {
+async function getBalance(token, account) {
   let balance = await token.methods.balanceOf(account).call();
   return balance;
 }
