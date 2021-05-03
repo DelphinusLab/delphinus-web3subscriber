@@ -2,10 +2,7 @@ const Mongo = require('mongodb');
 const Web3 = require("web3")
 const FileSys = require("fs")
 
-function get_abi_events(api_file) {
-  let abi_data = FileSys.readFileSync(api_file);
-  let data_json = JSON.parse(abi_data);
-  let abi_json = data_json.abi;
+function get_abi_events(abi_json) {
   let events = {};
   abi_json.forEach(t => {
     if (t.type=="event") {
@@ -77,7 +74,7 @@ class EventTracker {
     let abi_data = FileSys.readFileSync(abi_file);
     let data_json = JSON.parse(abi_data);
     this.abi_json = data_json.abi;
-    this.events = get_abi_events(abi_file);
+    this.events = get_abi_events(abi_json);
     this.address = data_json.networks[network_id].address;
     this.contract = new web3.eth.Contract(this.abi_json, this.address, {
       from:config.monitor_account
@@ -143,9 +140,6 @@ class EventTracker {
     return (await this.reset_events_info(db.db(), this.events));
   }
 }
-
-
-
 
 module.exports = {
   EventTracker: EventTracker
