@@ -28,7 +28,7 @@ async function getBalance(token) {
   return balance;
 }
 
-async function approveBalance(web3, token, contract, amount) {
+async function approveBalance(token, contract, amount) {
   let contract_address = contract.options.address;
   try {
     let rx = await token.methods.approve(contract_address, amount).send();
