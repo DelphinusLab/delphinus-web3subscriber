@@ -23,12 +23,12 @@ function getContract(web3, config, contract_info, account) {
   return contract;
 }
 
-async function get_balance(token) {
+async function getBalance(token) {
   let balance = await token.methods.balanceOf(account).call();
   return balance;
 }
 
-async function approve_balance(web3, token, contract, amount) {
+async function approveBalance(web3, token, contract, amount) {
   let contract_address = contract.options.address;
   try {
     let rx = await token.methods.approve(contract_address, amount).send();
@@ -41,4 +41,6 @@ async function approve_balance(web3, token, contract, amount) {
 module.exports = {
   initWeb3: initWeb3,
   getContract: getContract,
+  getBalance: getBalance,
+  approveBalance: approveBalance,
 }
