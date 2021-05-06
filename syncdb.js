@@ -72,7 +72,7 @@ class EventTracker {
     this.config = config;
     let web3 = new Web3(config.web3_source);
     this.abi_json = data_json.abi;
-    this.events = get_abi_events(abi_json);
+    this.events = get_abi_events(this.abi_json);
     this.address = data_json.networks[network_id].address;
     this.contract = new web3.eth.Contract(this.abi_json, this.address, {
       from:config.monitor_account
