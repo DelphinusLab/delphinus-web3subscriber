@@ -68,11 +68,9 @@ async function foldM (as, init, f) {
 }
 
 class EventTracker {
-  constructor(network_id, abi_file, config, handlers) {
+  constructor(network_id, data_json, config, handlers) {
     this.config = config;
     let web3 = new Web3(config.web3_source);
-    let abi_data = FileSys.readFileSync(abi_file);
-    let data_json = JSON.parse(abi_data);
     this.abi_json = data_json.abi;
     this.events = get_abi_events(abi_json);
     this.address = data_json.networks[network_id].address;
