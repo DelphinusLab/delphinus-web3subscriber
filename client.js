@@ -14,10 +14,34 @@ const initWeb3 = async (config, client_mode) => {
   }
 }
 
+const initWeb3Client = async () => {
+    // We are in client mode
+  await window.ethereum.send('eth_requestAccounts');
+  window.web3 = new Web3(window.ethereum);
+  return window.web3;
+}
+
+async function getDefaultAccount(web3, config) {
+  let account = config.monitor_account;
+  let accounts = await web3.eth.getAccounts();
+  if (accounts.length != 0) {
+    account = accounts[0];
+  }
+  return account;
+}
+
 function getContract(web3, config, contract_info, account) {
   let abi_json = contract_info.abi;
   let address = contract_info.networks[config.device_id].address;
   let contract = new web3.eth.Contract(abi_json, address, {
+    from:account
+  });
+  return contract;
+}
+
+function getContractByAddress(web3, contract_addr, contract_info, account) {
+  let abi_json = contract_info.abi;
+  let contract = new web3.eth.Contract(abi_json, contract_addr, {
     from:account
   });
   return contract;
@@ -40,7 +64,9 @@ async function approveBalance(token, contract, amount) {
 
 module.exports = {
   initWeb3: initWeb3,
+  getDefaultAccount: getDefaultAccount,
   getContract: getContract,
+  getContractByAddress : getContractByAddress,
   getBalance: getBalance,
   approveBalance: approveBalance,
 }
