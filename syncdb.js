@@ -74,10 +74,16 @@ class EventTracker {
     this.abi_json = data_json.abi;
     this.events = get_abi_events(this.abi_json);
     this.address = data_json.networks[network_id].address;
+    this.network_id = network_id;
     this.contract = new web3.eth.Contract(this.abi_json, this.address, {
       from:config.monitor_account
     });
     this.handlers = handlers;
+  }
+
+  get_db_url () {
+    let r = this.config.mongodb_url + "/" + this.network_id + this.address;
+    return r;
   }
 
   async sync_past_events(db) {
@@ -113,7 +119,7 @@ class EventTracker {
   }
 
   async sync_events () {
-    let url = this.config.mongodb_url + "/" + this.address;
+    let url = this.get_db_url();
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
     let ps = this.sync_past_events(db);
     return Promise.all(ps);
