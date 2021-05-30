@@ -126,7 +126,7 @@ class EventTracker {
   }
 
   async subscribe_events () {
-    let url = this.config.mongodb_url + "/" + this.address;
+    let url = this.get_db_url();
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
     this.subscribe_event (db.db());
     return true;
@@ -139,7 +139,7 @@ class EventTracker {
   }
 
   async reset_events () {
-    let url = this.config.mongodb_url + "/" + this.address;
+    let url = this.get_db_url();
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
     return (await this.reset_events_info(db.db(), this.events));
   }
