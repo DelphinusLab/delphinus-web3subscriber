@@ -10,7 +10,8 @@ const initWeb3 = async (config, client_mode) => {
     }
     throw "ClientNotHasEthereumPlugin";
   } else {
-    return new Web3(config.web3_source);
+    let provider = config.provider ();
+    return new Web3(provider);
   }
 }
 
