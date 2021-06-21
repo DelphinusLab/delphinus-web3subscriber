@@ -4,16 +4,15 @@ class PromiseBinder {
   }
   async bind (name, promise) {
     let p = promise;
+    //console.log(name, this.actions[name]);
+    //console.log(this.actions);
     if (this.actions[name]) {
       for (var c in this.actions[name]) {
         p = p.on(c, this.actions[name][c]);
-        let v = await p;
-        return v;
       }
-    } else {
-      let v = await p;
-      return v;
     }
+    let v = await p;
+    return v;
   }
   snapshot (name, func) {
     if(this.actions[snapshot][name] != undefined) {
