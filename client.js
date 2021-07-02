@@ -1,25 +1,23 @@
 const Web3 = require("web3")
 
+const web3instance = undefined;
+
 const initWeb3 = async (config, client_mode) => {
+  if (web3instance != undefined) {
+    return web3instance;
+  }
   if (client_mode) {
     // We are in client mode
     if (window.ethereum) {
       await window.ethereum.send('eth_requestAccounts');
-      window.web3 = new Web3(window.ethereum);
-      return window.web3;
+      web3instance = new Web3(window.ethereum);
+      return web3instance;
     }
     throw "ClientNotHasEthereumPlugin";
   } else {
     let provider = config.provider ();
     return new Web3(provider);
   }
-}
-
-const initWeb3Client = async () => {
-    // We are in client mode
-  await window.ethereum.send('eth_requestAccounts');
-  window.web3 = new Web3(window.ethereum);
-  return window.web3;
 }
 
 async function getDefaultAccount(web3, config) {
