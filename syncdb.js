@@ -111,6 +111,8 @@ class EventTracker {
       console.log(subscribe_id);
     })
     .on('data', async (r) => {
+      console.log("blockHash:", r.blockHash);
+      console.log("transactionHash:", r.transactionHash);
       console.log("subscribe event: %s", r.event);
       let e = await update_last_monitor_block(info_collection, this.events, r);
       this.handlers(r.event, e);

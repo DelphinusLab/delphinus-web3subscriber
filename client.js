@@ -1,6 +1,6 @@
 const Web3 = require("web3")
 
-const web3instance = undefined;
+var web3instance = undefined;
 
 const initWeb3 = async (config, client_mode) => {
   if (web3instance != undefined) {
