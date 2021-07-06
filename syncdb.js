@@ -67,10 +67,34 @@ async function foldM (as, init, f) {
   return c;
 }
 
+const Web3WsProvider = require('web3-providers-ws');
+
+var options = {
+    timeout: 30000, // ms
+
+     clientConfig: {
+      // Useful if requests are large
+      maxReceivedFrameSize: 100000000,   // bytes - default: 1MiB
+      maxReceivedMessageSize: 100000000, // bytes - default: 8MiB
+
+      // Useful to keep a connection alive
+      keepalive: true,
+      keepaliveInterval: 60000 // ms
+    },
+
+    // Enable auto reconnection
+    reconnect: {
+        auto: true,
+        delay: 5000, // ms
+        maxAttempts: 5,
+        onTimeout: true
+    }
+};
+
 class EventTracker {
   constructor(network_id, data_json, config, handlers) {
     this.config = config;
-    let web3 = new Web3(config.web3_source);
+    let web3 = new Web3(new Web3WsProvider(config.web3_source, options));
     this.abi_json = data_json.abi;
     this.events = get_abi_events(this.abi_json);
     this.address = data_json.networks[network_id].address;
@@ -104,20 +128,25 @@ class EventTracker {
     let info_collection = await get_info_collection(db);
     let lastblock = await get_last_monitor_block(info_collection);
     console.log ("monitor from %s", lastblock);
-    let r = await this.contract.events.allEvents(
+    let p = new Promise((resolve,reject) => {resolve(1);});
+    let r = this.contract.events.allEvents(
         {fromBlock:lastblock}
     );
     r.on("connected", subscribe_id => {
       console.log(subscribe_id);
     })
-    .on('data', async (r) => {
-      console.log("blockHash:", r.blockHash);
-      console.log("transactionHash:", r.transactionHash);
-      console.log("subscribe event: %s", r.event);
-      let e = await update_last_monitor_block(info_collection, this.events, r);
-      this.handlers(r.event, e);
+    .on('data', (r) => {
+      let log = new Promise((resolve, reject) => {
+        console.log("blockHash:", r.blockHash);
+        console.log("transactionHash:", r.transactionHash);
+        console.log("subscribe event: %s", r.event);
+        resolve(1);
+      });
+      p = p.then(() => log);
+      p = p.then(() => update_last_monitor_block(info_collection, this.events, r));
+      p = p.then((e) => this.handlers(r.event, e));
     });
-    return true;
+    await r;
   }
 
   async sync_events () {
@@ -130,7 +159,8 @@ class EventTracker {
   async subscribe_events () {
     let url = this.get_db_url();
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
-    this.subscribe_event (db.db());
+    await this.subscribe_event (db.db());
+    console.log("event subscribed");
     return true;
   }
 
