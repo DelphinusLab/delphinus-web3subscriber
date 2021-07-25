@@ -21,12 +21,30 @@ const initWeb3 = async (config, client_mode) => {
 }
 
 async function getDefaultAccount(web3, config) {
-  let account = config.monitor_account;
+  let account = "";
   let accounts = await web3.eth.getAccounts();
   if (accounts.length != 0) {
     account = accounts[0];
+  } else {
+    account = config.monitor_account;
   }
   return account;
+}
+
+async function getAccountInfo(config, client_mode) {
+  const web3 = await initWeb3(config, client_mode);
+  const address = await getDefaultAccount(web3, config);
+  const id = await web3.eth.net.getId();
+  console.log("account", address);
+  return {address: address, chainId:id, web3: web3};
+}
+
+function subscribeAccountChange(client_mode, cb) {
+  if (client_mode) {
+    window.ethereum.on('accountsChanged', function (accounts) {
+      cb(accounts[0]);
+    })
+  };
 }
 
 function getContract(web3, config, contract_info, account) {
@@ -64,8 +82,10 @@ async function approveBalance(token, contract, amount) {
 module.exports = {
   initWeb3: initWeb3,
   getDefaultAccount: getDefaultAccount,
+  getAccountInfo: getAccountInfo,
   getContract: getContract,
   getContractByAddress : getContractByAddress,
   getBalance: getBalance,
   approveBalance: approveBalance,
+  subscribeAccountChange: subscribeAccountChange,
 }

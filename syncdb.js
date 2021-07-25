@@ -132,19 +132,22 @@ class EventTracker {
     let r = this.contract.events.allEvents(
         {fromBlock:lastblock}
     );
+    let c = 0;
+    const g = async (r) => {
+      console.log("blockHash:", r.blockHash);
+      console.log("transactionHash:", r.transactionHash);
+      console.log("subscribe event: %s", r.event);
+      c++;
+      console.assert(c==1);
+      let e = await update_last_monitor_block(info_collection, this.events, r);
+      await this.handlers(r.event, e);
+      c--;
+    };
     r.on("connected", subscribe_id => {
       console.log(subscribe_id);
     })
     .on('data', (r) => {
-      let log = new Promise((resolve, reject) => {
-        console.log("blockHash:", r.blockHash);
-        console.log("transactionHash:", r.transactionHash);
-        console.log("subscribe event: %s", r.event);
-        resolve(1);
-      });
-      p = p.then(() => log);
-      p = p.then(() => update_last_monitor_block(info_collection, this.events, r));
-      p = p.then((e) => this.handlers(r.event, e));
+      p = p.then(() => g(r));
     });
     await r;
   }
