@@ -1,12 +1,16 @@
 const Web3 = require("web3")
 
 var web3instance = undefined;
+var web3monitors = {};
 
+/* There are two mode, the client mode requires a browser client
+ * and the monitor mode only requires the provider in config
+ */
 const initWeb3 = async (config, client_mode) => {
-  if (web3instance != undefined) {
-    return web3instance;
-  }
   if (client_mode) {
+    if (web3instance != undefined) {
+      return web3instance;
+    }
     // We are in client mode
     if (window.ethereum) {
       await window.ethereum.send('eth_requestAccounts');
@@ -15,8 +19,12 @@ const initWeb3 = async (config, client_mode) => {
     }
     throw "ClientNotHasEthereumPlugin";
   } else {
-    let provider = config.provider ();
-    return new Web3(provider);
+    if (web3monitors[config.device_id] == undefined) {
+      let provider = config.provider ();
+      let w = new Web3(provider);
+      web3monitors[config.device_id] = w;
+    }
+    return web3monitors[config.device_id];
   }
 }
 
