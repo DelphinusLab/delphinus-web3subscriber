@@ -20,8 +20,17 @@ const initWeb3 = async (config, client_mode) => {
     throw "ClientNotHasEthereumPlugin";
   } else {
     if (web3monitors[config.device_id] == undefined) {
-      let provider = config.provider ();
-      let w = new Web3(provider);
+      let w = new Web3();
+      const resetProvider = new function () {
+        let self = this;
+        this.resetter = (error) => {
+          console.log("connection error ...", error);
+          console.log("reset connection ... %s", config.device_id);
+          w.setProvider(config.provider(self));
+        };
+      };
+      console.log(resetProvider);
+      w.setProvider(config.provider(resetProvider));
       web3monitors[config.device_id] = w;
     }
     return web3monitors[config.device_id];
