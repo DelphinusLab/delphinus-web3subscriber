@@ -119,6 +119,7 @@ class EventTracker {
   constructor(network_id, data_json, config, handlers) {
     this.config = config;
     let web3 = new Web3(new Web3WsProvider(config.web3_source, options));
+    this.web3 = web3;
     this.abi_json = data_json.abi;
     this.events = get_abi_events(this.abi_json);
     this.address = data_json.networks[network_id].address;
@@ -179,6 +180,16 @@ class EventTracker {
     await this.subscribe_event (dbhelper);
     console.log("event subscribed");
     return true;
+  }
+
+  async subscribe_pending_events() {
+    //var subscription = this.web3.eth.subscribe('pendingTransactions',
+    var subscription = this.web3.eth.subscribe('logs',
+      {address: this.address},
+    )
+    .on("data", function(transaction){
+      console.log(transaction);
+    });
   }
 
   async reset_events_info (db) {
