@@ -137,13 +137,12 @@ class EventTracker {
 
   async sync_past_events(db) {
     let lastblock = await db.get_last_monitor_block();
-    console.log ("monitor %s from %s", event.name, lastblock);
     let past_events = await this.contract.getPastEvents("allEvents", {
-        fromBlock:lastblock, toBlock:"latest"
+      fromBlock:lastblock, toBlock:"latest"
     });
     return await foldM (past_events, [], async (acc, r) => {
-      let e = await update_last_monitor_block(db, info_collection, this.events, r);
-      acc.push(this.handlers(event.name, e, r.transactionHash));
+      let e = await db.update_last_monitor_block(this.events, r);
+      acc.push(this.handlers(r.event, e, r.transactionHash));
       return (acc);
     });
   }
@@ -164,7 +163,7 @@ class EventTracker {
       await this.handlers(r.event, e, r.transactionHash);
     };
     r.on("connected", subscribe_id => {
-      console.log(subscribe_id);
+      console.log("subscribe_id: "+subscribe_id);
     })
     .on('data', (r) => {
       p = p.then(() => g(r));
@@ -206,5 +205,6 @@ class EventTracker {
 }
 
 module.exports = {
-  EventTracker: EventTracker
+  EventTracker: EventTracker,
+  DBHelper: DBHelper
 }
