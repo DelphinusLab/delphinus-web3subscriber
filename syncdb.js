@@ -142,8 +142,12 @@ class EventTracker {
         fromBlock:lastblock, toBlock:"latest"
     });
     return await foldM (past_events, [], async (acc, r) => {
-      let e = await update_last_monitor_block(db, info_collection, this.events, r);
-      acc.push(this.handlers(event.name, e, r.transactionHash));
+      console.log("========================= Get Event: %s ========================", r.event);
+      console.log("blockNumber:", r.blockNumber);
+      console.log("blockHash:", r.blockHash);
+      console.log("transactionHash:", r.transactionHash);
+      let e = await update_last_monitor_block(this.events, r);
+      acc.push(this.handlers(r.event, e, r.transactionHash));
       return (acc);
     });
   }
