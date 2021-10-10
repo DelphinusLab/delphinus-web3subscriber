@@ -137,7 +137,7 @@ class EventTracker {
 
   async sync_past_events(db) {
     let lastblock = await db.get_last_monitor_block();
-    console.log ("monitor %s from %s", event.name, lastblock);
+    console.log ("monitor from %s", lastblock);
     let past_events = await this.contract.getPastEvents("allEvents", {
         fromBlock:lastblock, toBlock:"latest"
     });
@@ -146,7 +146,7 @@ class EventTracker {
       console.log("blockNumber:", r.blockNumber);
       console.log("blockHash:", r.blockHash);
       console.log("transactionHash:", r.transactionHash);
-      let e = await update_last_monitor_block(this.events, r);
+      let e = await db.update_last_monitor_block(this.events, r);
       acc.push(this.handlers(r.event, e, r.transactionHash));
       return (acc);
     });
@@ -174,6 +174,16 @@ class EventTracker {
       p = p.then(() => g(r));
     });
     await r;
+  }
+
+  async sync_events () {
+    let url = this.get_db_url();
+    let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
+    let dbhelper = new DBHelper(db.db());
+    await dbhelper.init();
+    await this.sync_past_events(dbhelper);
+    console.log("event subscribed");
+    return true;
   }
 
   async subscribe_events () {
