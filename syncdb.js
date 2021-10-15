@@ -19,7 +19,7 @@ const options = {
 
       // Useful to keep a connection alive
       keepalive: true,
-      keepaliveInterval: 60000 // ms
+      keepaliveInterval: 6000 // ms
     },
 
     // Enable auto reconnection
@@ -117,9 +117,29 @@ class DBHelper {
 
 class EventTracker {
   constructor(network_id, data_json, config, handlers) {
+
+    this.init_provider = () => {
+        let provider = new Web3WsProvider(config.web3_source, options);
+        provider.connection.onopen = () => {
+            console.info("Event Tracker Started");
+        };
+
+        provider.connection.onerror = function() {
+           console.info("connection error");
+        };
+
+        provider.connection.onclose = function() {
+           console.info("connection close");
+        };
+        return provider;
+    };
+
+    let provider = this.init_provider();
+    let web3 = new Web3(provider);
+    this.provider = provider;
     this.config = config;
-    let web3 = new Web3(new Web3WsProvider(config.web3_source, options));
     this.web3 = web3;
+
     this.abi_json = data_json.abi;
     this.events = get_abi_events(this.abi_json);
     this.address = data_json.networks[network_id].address;
@@ -168,7 +188,7 @@ class EventTracker {
       await this.handlers(r.event, e, r.transactionHash);
     };
     r.on("connected", subscribe_id => {
-      console.log(subscribe_id);
+      console.log("subscribe id:", subscribe_id);
     })
     .on('data', (r) => {
       p = p.then(() => g(r));
@@ -191,8 +211,22 @@ class EventTracker {
     let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
     let dbhelper = new DBHelper(db.db());
     await dbhelper.init();
-    await this.subscribe_event (dbhelper);
+    let _this = this;
+    this.heart_beat = setInterval(()=> {
+        if (_this.provider.connection.readyState == 1) {
+            _this.provider.connection.send('HeartBeat');
+            console.info("HeartBeat Sent");
+        } else {
+            console.info("Connection Not Ready");
+            console.info("Reconnecting ...");
+            _this.provider = _this.init_provider();
+            _this.web3.setProvider(_this.provider);
+            _this.web3.eth.clearSubscriptions();
+            _this.subscribe_event (dbhelper);
+        }
+    }, 10000);
     console.log("event subscribed");
+    this.subscribe_event (dbhelper);
     return true;
   }
 
