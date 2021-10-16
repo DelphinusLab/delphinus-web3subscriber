@@ -31,14 +31,6 @@ const options = {
     }
 };
 
-async function foldM (as, init, f) {
-  let c = init;
-  for (i=0;i<as.length;i++) {
-    c = await f(c, as[i]);
-  }
-  return c;
-}
-
 function get_abi_events(abi_json) {
   let events = {};
   abi_json.forEach(t => {
@@ -93,23 +85,26 @@ class DBHelper {
     }
   }
 
-  async update_last_monitor_block(events, r) {
-    let event = events[r.event];
-    let event_collection = await query_event_collection(this.db, r.event);
-    let result = await this.info_collection.updateOne(
+  async update_last_monitor_block(r, v) {
+    await this.info_collection.updateOne(
       {name:"LastUpdatedBlock"},
       {$set:{lastblock:r.blockNumber}},
       {upsert:true}
     );
-    let v = {};
-    event.inputs.forEach(i => {
-      v[i.name] = r.returnValues[i.name];
-    });
+    let event_collection = await query_event_collection(this.db, r.event);
     await event_collection.insertOne({
       blockNumber: r.blockNumber,
       blockHash: r.blockHash,
       transactionHash: r.transactionHash,
       event: v
+    });
+  }
+
+  build_event_value(events, r) {
+    let event = events[r.event];
+    let v = {};
+    event.inputs.forEach(i => {
+      v[i.name] = r.returnValues[i.name];
     });
     return v;
   }
@@ -148,6 +143,7 @@ class EventTracker {
       from:config.monitor_account
     });
     this.handlers = handlers;
+    console.log(this.handlers);
   }
 
   get_db_url () {
@@ -157,19 +153,22 @@ class EventTracker {
 
   async sync_past_events(db) {
     let lastblock = await db.get_last_monitor_block();
-    console.log ("monitor from %s", lastblock);
+    console.log ("sync from ", lastblock);
     let past_events = await this.contract.getPastEvents("allEvents", {
-        fromBlock:lastblock, toBlock:"latest"
+        fromBlock:lastblock + 1
+        //fromBlock:"latest"
+        //, toBlock:"latest"
     });
-    return await foldM (past_events, [], async (acc, r) => {
+    for (var r of past_events) {
       console.log("========================= Get Event: %s ========================", r.event);
       console.log("blockNumber:", r.blockNumber);
       console.log("blockHash:", r.blockHash);
       console.log("transactionHash:", r.transactionHash);
-      let e = await db.update_last_monitor_block(this.events, r);
-      acc.push(this.handlers(r.event, e, r.transactionHash));
-      return (acc);
-    });
+      let e = db.build_event_value(this.events, r);
+      console.log(r.event);
+      await this.handlers(r.event, e, r.transactionHash);
+      await db.update_last_monitor_block(r,e);
+    };
   }
 
   async subscribe_event (db) {
@@ -184,8 +183,9 @@ class EventTracker {
       console.log("blockNumber:", r.blockNumber);
       console.log("blockHash:", r.blockHash);
       console.log("transactionHash:", r.transactionHash);
-      let e = await db.update_last_monitor_block(this.events, r);
+      let e = db.build_event_value(this.events, r);
       await this.handlers(r.event, e, r.transactionHash);
+      await db.update_last_monitor_block(r, e);
     };
     r.on("connected", subscribe_id => {
       console.log("subscribe id:", subscribe_id);
@@ -219,15 +219,46 @@ class EventTracker {
         } else {
             console.info("Connection Not Ready");
             console.info("Reconnecting ...");
+            _this.provider.connection.close();
             _this.provider = _this.init_provider();
-            _this.web3.setProvider(_this.provider);
             _this.web3.eth.clearSubscriptions();
+            _this.web3.setProvider(_this.provider);
             _this.subscribe_event (dbhelper);
         }
-    }, 10000);
+    }, 50000);
     console.log("event subscribed");
     this.subscribe_event (dbhelper);
     return true;
+  }
+
+  async polling(db) {
+    try {
+      await this.sync_past_events(db);
+      await setTimeout(() => {
+        console.log("Polling ...");
+        this.polling(db);
+      }, 5000);
+    } catch (e) {
+      console.log("Sync Event Error:");
+      console.log(e.message);
+      console.info("Reconnecting ...");
+      this.provider.connection.close();
+      this.provider = this.init_provider();
+      this.web3.eth.clearSubscriptions();
+      this.web3.setProvider(this.provider);
+      await setTimeout(() => {
+        console.log("Polling ...");
+        this.polling(db);
+      }, 5000);
+    }
+  }
+
+  async sync_events() {
+    let url = this.get_db_url();
+    let db = await Mongo.MongoClient.connect(url, {useUnifiedTopology: true});
+    let dbhelper = new DBHelper(db.db());
+    await dbhelper.init();
+    await this.polling(dbhelper);
   }
 
   async subscribe_pending_events() {
@@ -235,7 +266,7 @@ class EventTracker {
     var subscription = this.web3.eth.subscribe('logs',
       {address: this.address},
     )
-    .on("data", function(transaction){
+    .on("data", function(transaction) {
       console.log(transaction);
     });
   }
