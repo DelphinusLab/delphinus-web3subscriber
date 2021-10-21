@@ -114,7 +114,7 @@ class EventTracker {
   constructor(network_id, data_json, config, handlers) {
 
     this.init_provider = () => {
-        let provider = new Web3WsProvider(config.web3_source, options);
+        let provider = new Web3WsProvider(config.ws_source, options);
         provider.connection.onopen = () => {
             console.info("Event Tracker Started");
         };
