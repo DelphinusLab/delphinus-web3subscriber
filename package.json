@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "a web3 subscriber for easy truffle based projects",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "npx tsc"
   },
   "repository": {
     "type": "git",
@@ -22,5 +23,8 @@
   "dependencies": {
     "web3": "1.5.3",
     "mongodb": "^3.6.6"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.4"
   }
 }
