@@ -65,6 +65,10 @@ export abstract class DelphinusWeb3 {
   }
 
   getDefaultAccount() {
+    if (this.web3Instance.eth.defaultAccount === null) {
+      throw "DefaultAccount is null";
+    }
+
     return this.web3Instance.eth.defaultAccount;
   }
 
