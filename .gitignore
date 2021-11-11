@@ -1,5 +1,3 @@
 node_modules
-src/pbinder.js
-src/pbinder.js.map
-src/client.js
-src/client.js.map
+*.js
+*.js.map
