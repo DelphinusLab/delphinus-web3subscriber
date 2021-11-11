@@ -21,8 +21,10 @@
   },
   "homepage": "https://github.com/zoyoeproject/web3subscriber#readme",
   "dependencies": {
-    "web3": "1.5.3",
-    "mongodb": "^3.6.6"
+    "@metamask/detect-provider": "^1.2.0",
+    "@metamask/providers": "^8.1.1",
+    "mongodb": "^3.6.6",
+    "web3": "1.5.3"
   },
   "devDependencies": {
     "typescript": "^4.4.4"
