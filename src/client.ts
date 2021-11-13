@@ -7,20 +7,31 @@ import BN from "bn.js";
 
 export class DelphinusContract {
   private readonly contract: Contract;
+  private readonly jsonInterface: any;
 
   constructor(
-    web3Instance: Web3,
+    web3Instance: DelphinusWeb3,
     jsonInterface: any,
     address: string,
-    account: string
+    account?: string
   ) {
-    this.contract = new web3Instance.eth.Contract(jsonInterface.abi, address, {
-      from: account,
-    });
+    this.jsonInterface = jsonInterface;
+
+    this.contract = new web3Instance.web3Instance.eth.Contract(
+      jsonInterface.abi,
+      address,
+      {
+        from: account || web3Instance.getDefaultAccount(),
+      }
+    );
   }
 
-  async getBalance(account: string) {
-    return await this.contract.methods.balanceOf(account).call();
+  getWeb3Contract() {
+    return this.contract;
+  }
+
+  getJsonInterface() {
+    return this.jsonInterface;
   }
 
   async getPastEventsFrom(fromBlock: number) {
@@ -29,8 +40,8 @@ export class DelphinusContract {
     });
   }
 
-  getContractInstance() {
-    return this.contract;
+  address() {
+    return this.contract.options.address;
   }
 }
 
@@ -99,12 +110,12 @@ export abstract class DelphinusWeb3 {
    * @param {string} address - The address of the smart contract to call.
    * @param {string} account - The address transactions should be made from.
    */
-  getContract(jsonInterface: any, address: string, account: string) {
+  getContract(jsonInterface: any, address: string, account?: string) {
     return new DelphinusContract(
-      this.web3Instance,
+      this,
       jsonInterface,
       address,
-      account
+      account || this.getDefaultAccount()
     );
   }
 }
