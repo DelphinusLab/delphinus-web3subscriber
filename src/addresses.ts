@@ -1,4 +1,4 @@
-import BN from "bn.js";
+import BN from 'bn.js';
 
 const { addressIdToAddress, addressToAddressId } = require("substrate-ss58");
 const L1ADDR_BITS = 160;
