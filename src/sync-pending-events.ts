@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, Document } from "mongodb";
+import { MongoClient, Db, Collection, Document, ExplainVerbosity } from "mongodb";
 import { WebsocketProvider } from "web3-providers-ws";
 import { EventData } from "web3-eth-contract";
 import { provider } from "web3-core";
@@ -64,20 +64,22 @@ class DBHelper {
     this.url = url;
   }
 
-  private async getDb() {
-    if (!this.db) {
-      this.client = await MongoClient.connect(this.url);
-      this.db = await this.client.db();
+  async connect() {
+    this.client = await MongoClient.connect(this.url);
+    this.db = this.client.db();
+  }
+
+  private getDb() {
+    if (this.db === undefined) {
+      throw new Error("db was not initialized");
     }
 
     return this.db;
   }
 
-  private async getClient() {
-    await this.getDb();
-
+  async getClient() {
     if (this.client === undefined) {
-      throw "Failed to connect mongodb";
+      throw new Error("db was not initialized");
     }
 
     return this.client;
@@ -88,7 +90,7 @@ class DBHelper {
   }
 
   private async getOrCreateEventCollection(eventName: string) {
-    let db = await this.getDb();
+    let db = this.getDb();
     let collections = await db.listCollections({ name: eventName }).toArray();
 
     if (collections.length == 0) {
@@ -142,6 +144,13 @@ class DBHelper {
 
 async function withDBHelper(uri: string, cb: (db: DBHelper) => Promise<void>) {
   let db = new DBHelper(uri);
+  try {
+    await db.connect();
+  } catch(e) {
+    console.log("failed to connect with db");
+    process.exit(-1);
+  }
+
   try {
     return await cb(db);
   } finally {
