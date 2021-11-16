@@ -1,12 +1,14 @@
-import { MongoClient, Db, Collection, Document, ExplainVerbosity } from "mongodb";
+import {
+  MongoClient,
+  Db,
+  Collection,
+  Document,
+  ExplainVerbosity,
+} from "mongodb";
 import { WebsocketProvider } from "web3-providers-ws";
 import { EventData } from "web3-eth-contract";
 import { provider } from "web3-core";
-import {
-  DelphinusContract,
-  DelphinusWeb3,
-  Web3ProviderMode,
-} from "./client";
+import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 
 const Web3WsProvider = require("web3-providers-ws");
 
@@ -25,7 +27,7 @@ const options = {
 
   // Enable auto reconnection
   reconnect: {
-    auto: true,
+    auto: false,
     delay: 5000, // ms
     maxAttempts: 5,
     onTimeout: true,
@@ -146,9 +148,9 @@ async function withDBHelper(uri: string, cb: (db: DBHelper) => Promise<void>) {
   let db = new DBHelper(uri);
   try {
     await db.connect();
-  } catch(e) {
-    console.log("failed to connect with db");
-    process.exit(-1);
+  } catch (e) {
+    console.log("failed to connect with db, DBHelper exiting...");
+    return;
   }
 
   try {
@@ -185,7 +187,8 @@ export class EventTracker {
       };
 
       provider.connection.onerror = () => {
-        console.info("connection error");
+        console.info("connection error, process exiting...");
+        process.exit(-1);
       };
 
       provider.connection.onclose = () => {
@@ -210,11 +213,7 @@ export class EventTracker {
 
     this.l1Events = getAbiEvents(dataJson.abi);
     this.address = dataJson.networks[networkId].address;
-    this.contract = web3.getContract(
-      dataJson,
-      this.address,
-      monitorAccount
-    );
+    this.contract = web3.getContract(dataJson, this.address, monitorAccount);
     this.handlers = handlers;
     this.dbUrl = mongodbUrl + "/" + networkId + this.address;
   }
@@ -274,8 +273,8 @@ export class EventTracker {
   // For debug
   async subscribePendingEvents() {
     //var subscription = this.web3.eth.subscribe('pendingTransactions',
-    this.web3.web3Instance!.eth
-      .subscribe("logs", { address: this.address })
+    this.web3
+      .web3Instance!.eth.subscribe("logs", { address: this.address })
       .on("data", (transaction: any) => {
         console.log(transaction);
       });
@@ -296,5 +295,30 @@ export class EventTracker {
 
   async close() {
     await this.provider.connection.close();
+  }
+}
+
+export async function withEventTracker(
+  networkId: string,
+  dataJson: any,
+  websocketSource: string,
+  monitorAccount: string,
+  mongodbUrl: string,
+  handlers: (n: string, v: any, hash: string) => Promise<void>,
+  cb: (eventTracker: EventTracker) => Promise<void>
+) {
+  let eventTracker = new EventTracker(
+    networkId,
+    dataJson,
+    websocketSource,
+    monitorAccount,
+    mongodbUrl,
+    handlers
+  );
+
+  try {
+    await cb(eventTracker);
+  } finally {
+    await eventTracker.close();
   }
 }
