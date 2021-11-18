@@ -5,6 +5,8 @@ import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
 import BN from "bn.js";
 
+import { DelphinusProvider } from "./provider";
+
 export class DelphinusContract {
   private readonly contract: Contract;
   private readonly jsonInterface: any;
@@ -47,14 +49,13 @@ export class DelphinusContract {
 
 export abstract class DelphinusWeb3 {
   web3Instance: Web3;
-  private readonly closeWeb3?: (_: provider) => Promise<void>;
 
   constructor(web3Instance: Web3, close?: (_: provider) => Promise<void>) {
     this.web3Instance = web3Instance;
-    this.closeWeb3 = close;
   }
 
   abstract connect(): Promise<void>;
+  abstract close(): Promise<void>;
 
   /**
    * switching the wallet’s active Ethereum chain.
@@ -64,12 +65,6 @@ export abstract class DelphinusWeb3 {
     chainName: string,
     rpcSource: string
   ): Promise<void>;
-
-  async close() {
-    if (this.web3Instance && this.closeWeb3 !== undefined) {
-      await this.closeWeb3(this.web3Instance.currentProvider);
-    }
-  }
 
   async getNetworkId() {
     return await this.web3Instance.eth.net.getId();
@@ -138,6 +133,8 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
     this.setDefaultAccount(accounts[0]);
   }
 
+  async close() {}
+
   async subscribeAccountChange<T>(cb: (account: string) => T) {
     this.provider.on("accountsChanged", (...accounts: unknown[]) => {
       cb(accounts[0] as any);
@@ -186,15 +183,21 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
 
 export class Web3ProviderMode extends DelphinusWeb3 {
   readonly monitorAccount: string;
+  readonly delphinusProvider: DelphinusProvider;
 
   constructor(config: MonitorMode) {
-    super(new Web3(config.provider), config.closeProvider);
+    super(new Web3(config.provider.provider));
 
+    this.delphinusProvider = config.provider;
     this.monitorAccount = config.monitorAccount;
     super.setDefaultAccount(config.monitorAccount);
   }
 
   async connect() {}
+
+  async close() {
+    await this.delphinusProvider.close();
+  }
 
   async switchNet(
     chainHexId: string,
@@ -204,8 +207,7 @@ export class Web3ProviderMode extends DelphinusWeb3 {
 }
 
 export interface MonitorMode {
-  provider: provider;
-  closeProvider: (prov: provider) => Promise<void>;
+  provider: DelphinusProvider;
   monitorAccount: string;
 }
 

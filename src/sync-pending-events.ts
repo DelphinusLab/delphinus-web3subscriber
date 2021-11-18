@@ -9,6 +9,7 @@ import { WebsocketProvider } from "web3-providers-ws";
 import { EventData } from "web3-eth-contract";
 import { provider } from "web3-core";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
+import { DelphinusWsProvider } from "./provider";
 
 const Web3WsProvider = require("web3-providers-ws");
 
@@ -161,8 +162,6 @@ async function withDBHelper(uri: string, cb: (db: DBHelper) => Promise<void>) {
 }
 
 export class EventTracker {
-  private readonly initProvider: () => WebsocketProvider;
-  private provider: WebsocketProvider;
   private readonly web3: DelphinusWeb3;
   private readonly contract: DelphinusContract;
   private readonly address: string;
@@ -180,37 +179,13 @@ export class EventTracker {
     mongodbUrl: string,
     handlers: (n: string, v: any, hash: string) => Promise<void>
   ) {
-    this.initProvider = () => {
-      let provider = new Web3WsProvider(websocketSource, options);
-      provider.connection.onopen = () => {
-        console.info("Event Tracker Started");
-      };
-
-      provider.connection.onerror = () => {
-        console.info("connection error, process exiting...");
-        process.exit(-1);
-      };
-
-      provider.connection.onclose = () => {
-        console.info("connection close");
-      };
-      return provider;
-    };
-
-    let closeProviderHelper = async (provider: provider) => {
-      await (provider as any).connection.close();
-    };
-
-    let provider = this.initProvider();
     let providerConfig = {
-      provider: provider,
-      closeProvider: closeProviderHelper,
+      provider: new DelphinusWsProvider(websocketSource),
       monitorAccount: monitorAccount,
     };
     let web3 = new Web3ProviderMode(providerConfig);
-    this.provider = provider;
-    this.web3 = web3;
 
+    this.web3 = web3;
     this.l1Events = getAbiEvents(dataJson.abi);
     this.address = dataJson.networks[networkId].address;
     this.contract = web3.getContract(dataJson, this.address, monitorAccount);
@@ -236,37 +211,9 @@ export class EventTracker {
     }
   }
 
-  private async polling(db: DBHelper) {
-    try {
-      await this.syncPastEvents(db);
-      await setTimeout(() => {
-        console.log("Polling ...");
-        this.polling(db);
-      }, 5000);
-    } catch (e: any) {
-      console.log("Sync Event Error:");
-      console.log(e.message);
-      console.info("Reconnecting ...");
-      this.provider.connection.close();
-      this.provider = this.initProvider();
-      this.web3.web3Instance!.eth.clearSubscriptions(
-        (error: Error, result: boolean) => {}
-      );
-      this.web3.web3Instance!.setProvider(this.provider);
-      await setTimeout(() => {
-        console.log("Polling ...");
-        this.polling(db);
-      }, 5000);
-    }
-  }
-
-  async syncEvents(loop = false) {
+  async syncEvents() {
     await withDBHelper(this.dbUrl, async (dbhelper: DBHelper) => {
-      if (loop) {
-        await this.polling(dbhelper);
-      } else {
-        await this.syncPastEvents(dbhelper);
-      }
+      await this.syncPastEvents(dbhelper);
     });
   }
 
@@ -294,7 +241,7 @@ export class EventTracker {
   }
 
   async close() {
-    await this.provider.connection.close();
+    await this.web3.close();
   }
 }
 

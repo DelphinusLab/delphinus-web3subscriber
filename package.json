@@ -23,6 +23,7 @@
   "dependencies": {
     "@metamask/detect-provider": "^1.2.0",
     "@metamask/providers": "^8.1.1",
+    "@truffle/hdwallet-provider": "^1.6.0",
     "@types/bn.js": "^5.1.0",
     "bn.js": "^5.2.0",
     "mongodb": "^4.1.4",
