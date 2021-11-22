@@ -1,39 +1,8 @@
-import {
-  MongoClient,
-  Db,
-  Collection,
-  Document,
-  ExplainVerbosity,
-} from "mongodb";
-import { WebsocketProvider } from "web3-providers-ws";
+import { Collection, Document } from "mongodb";
 import { EventData } from "web3-eth-contract";
-import { provider } from "web3-core";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusWsProvider } from "./provider";
-
-const Web3WsProvider = require("web3-providers-ws");
-
-const options = {
-  timeout: 30000, // ms
-
-  clientConfig: {
-    // Useful if requests are large
-    maxReceivedFrameSize: 100000000, // bytes - default: 1MiB
-    maxReceivedMessageSize: 100000000, // bytes - default: 8MiB
-
-    // Useful to keep a connection alive
-    keepalive: true,
-    keepaliveInterval: 6000, // ms
-  },
-
-  // Enable auto reconnection
-  reconnect: {
-    auto: false,
-    delay: 5000, // ms
-    maxAttempts: 5,
-    onTimeout: true,
-  },
-};
+import { DBHelper, withDBHelper } from "./dbhelper";
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -57,52 +26,8 @@ function buildEventValue(events: any, r: EventData) {
 }
 
 /* Mongo Db helper to track all the recorded events handled so far */
-class DBHelper {
-  private readonly url: string;
-  private client?: MongoClient;
-  private db?: Db;
+class EventDBHelper extends DBHelper {
   private infoCollection?: Collection<Document>;
-
-  constructor(url: string) {
-    this.url = url;
-  }
-
-  async connect() {
-    this.client = await MongoClient.connect(this.url);
-    this.db = this.client.db();
-  }
-
-  private getDb() {
-    if (this.db === undefined) {
-      throw new Error("db was not initialized");
-    }
-
-    return this.db;
-  }
-
-  async getClient() {
-    if (this.client === undefined) {
-      throw new Error("db was not initialized");
-    }
-
-    return this.client;
-  }
-
-  async close() {
-    await this.client?.close();
-  }
-
-  private async getOrCreateEventCollection(eventName: string) {
-    let db = this.getDb();
-    let collections = await db.listCollections({ name: eventName }).toArray();
-
-    if (collections.length == 0) {
-      console.log("Init collection: ", eventName);
-      return await db.createCollection(eventName);
-    } else {
-      return db.collection(eventName);
-    }
-  }
 
   async getInfoCollection() {
     if (!this.infoCollection) {
@@ -145,22 +70,6 @@ class DBHelper {
   }
 }
 
-async function withDBHelper(uri: string, cb: (db: DBHelper) => Promise<void>) {
-  let db = new DBHelper(uri);
-  try {
-    await db.connect();
-  } catch (e) {
-    console.log("failed to connect with db, DBHelper exiting...");
-    return;
-  }
-
-  try {
-    return await cb(db);
-  } finally {
-    await db.close();
-  }
-}
-
 export class EventTracker {
   private readonly web3: DelphinusWeb3;
   private readonly contract: DelphinusContract;
@@ -193,7 +102,7 @@ export class EventTracker {
     this.dbUrl = mongodbUrl + "/" + networkId + this.address;
   }
 
-  private async syncPastEvents(db: DBHelper) {
+  private async syncPastEvents(db: EventDBHelper) {
     let lastblock = await db.getLastMonitorBlock();
     console.log("sync from ", lastblock);
     let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
@@ -212,9 +121,13 @@ export class EventTracker {
   }
 
   async syncEvents() {
-    await withDBHelper(this.dbUrl, async (dbhelper: DBHelper) => {
-      await this.syncPastEvents(dbhelper);
-    });
+    await withDBHelper(
+      EventDBHelper,
+      this.dbUrl,
+      async (dbhelper: EventDBHelper) => {
+        await this.syncPastEvents(dbhelper);
+      }
+    );
   }
 
   // For debug
@@ -227,7 +140,7 @@ export class EventTracker {
       });
   }
 
-  private async resetEventsInfo(db: DBHelper) {
+  private async resetEventsInfo(db: EventDBHelper) {
     let infoCollection = await db.getInfoCollection();
     await infoCollection.deleteMany({ name: "LastUpdatedBlock" });
     // TODO: eventCollection should also be deleted?
@@ -235,9 +148,13 @@ export class EventTracker {
   }
 
   async resetEvents() {
-    await withDBHelper(this.dbUrl, async (dbhelper: DBHelper) => {
-      await this.resetEventsInfo(dbhelper);
-    });
+    await withDBHelper(
+      EventDBHelper,
+      this.dbUrl,
+      async (dbhelper: EventDBHelper) => {
+        await this.resetEventsInfo(dbhelper);
+      }
+    );
   }
 
   async close() {
