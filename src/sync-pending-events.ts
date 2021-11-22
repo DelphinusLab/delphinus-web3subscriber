@@ -85,8 +85,7 @@ export class EventTracker {
     dataJson: any,
     websocketSource: string,
     monitorAccount: string,
-    mongodbUrl: string,
-    handlers: (n: string, v: any, hash: string) => Promise<void>
+    mongodbUrl: string
   ) {
     let providerConfig = {
       provider: new DelphinusWsProvider(websocketSource),
@@ -98,11 +97,13 @@ export class EventTracker {
     this.l1Events = getAbiEvents(dataJson.abi);
     this.address = dataJson.networks[networkId].address;
     this.contract = web3.getContract(dataJson, this.address, monitorAccount);
-    this.handlers = handlers;
     this.dbUrl = mongodbUrl + "/" + networkId + this.address;
   }
 
-  private async syncPastEvents(db: EventDBHelper) {
+  private async syncPastEvents(
+    handlers: (n: string, v: any, hash: string) => Promise<void>,
+    db: EventDBHelper
+  ) {
     let lastblock = await db.getLastMonitorBlock();
     console.log("sync from ", lastblock);
     let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
@@ -115,17 +116,19 @@ export class EventTracker {
       console.log("blockHash:", r.blockHash);
       console.log("transactionHash:", r.transactionHash);
       let e = buildEventValue(this.l1Events, r);
-      await this.handlers(r.event, e, r.transactionHash);
+      await handlers(r.event, e, r.transactionHash);
       await db.updateLastMonitorBlock(r, e);
     }
   }
 
-  async syncEvents() {
+  async syncEvents(
+    handlers: (n: string, v: any, hash: string) => Promise<void>
+  ) {
     await withDBHelper(
       EventDBHelper,
       this.dbUrl,
       async (dbhelper: EventDBHelper) => {
-        await this.syncPastEvents(dbhelper);
+        await this.syncPastEvents(handlers, dbhelper);
       }
     );
   }
@@ -168,7 +171,6 @@ export async function withEventTracker(
   websocketSource: string,
   monitorAccount: string,
   mongodbUrl: string,
-  handlers: (n: string, v: any, hash: string) => Promise<void>,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -176,8 +178,7 @@ export async function withEventTracker(
     dataJson,
     websocketSource,
     monitorAccount,
-    mongodbUrl,
-    handlers
+    mongodbUrl
   );
 
   try {
