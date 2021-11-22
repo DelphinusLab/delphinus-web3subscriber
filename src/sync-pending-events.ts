@@ -78,7 +78,6 @@ export class EventTracker {
 
   // TODO: replace any with real type
   private readonly l1Events: any;
-  private readonly handlers: (n: string, v: any, hash: string) => Promise<void>;
 
   constructor(
     networkId: string,
