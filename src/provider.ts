@@ -1,5 +1,5 @@
 import { HttpProvider, WebsocketProvider, provider } from "web3-core";
-const HDWalletProvider = require("@truffle/hdwallet-provider");
+import HDWalletProvider from "@truffle/hdwallet-provider";
 const Web3HttpProvider = require("web3-providers-http");
 const Web3WsProvider = require("web3-providers-ws");
 
@@ -40,6 +40,12 @@ export class DelphinusHDWalletProvider extends DelphinusProvider {
         shareNonce: false,
       })
     );
+
+    // TODO: Exit a process is not appropriate since it's a lib!
+    (this.provider as HDWalletProvider).engine.on("error", (err: any) => {
+      console.info("HDWalletProvider connection error, process exiting...");
+      process.exit(-1);
+    });
   }
 
   async close() {
@@ -51,6 +57,7 @@ export class DelphinusWsProvider extends DelphinusProvider {
   constructor(uri: string) {
     super(new Web3WsProvider(uri, DelphinusWsProvider.getDefaultOption()));
 
+    // TODO: Exit a process is not appropriate since it's a lib!
     (this.provider as WebsocketProvider).connection.onerror = () => {
       console.info("websocket connection error, process exiting...");
       process.exit(-1);
