@@ -49,10 +49,10 @@ export class DBHelper {
 
 type AConstructorTypeOf<T> = new (...args: any[]) => T;
 
-export async function withDBHelper<T extends DBHelper>(
+export async function withDBHelper<T extends DBHelper, R>(
   Ctor: AConstructorTypeOf<T>,
   uri: string,
-  cb: (db: T) => Promise<void>
+  cb: (db: T) => Promise<R>
 ) {
   let db = new Ctor(uri);
   try {
