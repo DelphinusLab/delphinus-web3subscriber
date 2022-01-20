@@ -231,3 +231,5 @@ export async function withProviderWeb3<t>(
   let web3 = new DelphinusRpcProvider(config);
   return await withDelphinusWeb3(web3, cb);
 }
+
+export type DelphinusAccount = ethers.Signer;
