@@ -1,30 +1,24 @@
-import Web3 from "web3";
-import { Contract } from "web3-eth-contract";
-import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
 import BN from "bn.js";
-
-import { DelphinusProvider } from "./provider";
+import { ethers } from "ethers";
 
 export class DelphinusContract {
-  private readonly contract: Contract;
+  private readonly contract: ethers.Contract;
   private readonly jsonInterface: any;
 
   constructor(
-    web3Instance: DelphinusWeb3,
+    delphinusProvider: DelphinusProvider,
     jsonInterface: any,
     address: string,
-    account?: string
+    signer?: ethers.Signer
   ) {
     this.jsonInterface = jsonInterface;
 
-    this.contract = new web3Instance.web3Instance.eth.Contract(
+    this.contract = new ethers.Contract(
       jsonInterface.abi,
       address,
-      {
-        from: account || web3Instance.getDefaultAccount(),
-      }
+      signer || delphinusProvider.provider
     );
   }
 
@@ -47,15 +41,15 @@ export class DelphinusContract {
   }
 }
 
-export abstract class DelphinusWeb3 {
-  web3Instance: Web3;
+export abstract class DelphinusProvider {
+  provider: ethers.providers.JsonRpcProvider;
 
-  constructor(web3Instance: Web3, close?: (_: provider) => Promise<void>) {
-    this.web3Instance = web3Instance;
+  constructor(ethersProvider: ethers.providers.JsonRpcProvider) {
+    this.provider = ethersProvider;
   }
 
   abstract connect(): Promise<void>;
-  abstract close(): Promise<void>;
+  async close() {}
 
   /**
    * switching the wallet’s active Ethereum chain.
@@ -67,9 +61,18 @@ export abstract class DelphinusWeb3 {
   ): Promise<void>;
 
   async getNetworkId() {
-    return await this.web3Instance.eth.net.getId();
+    return await this.provider.network.chainId;
   }
 
+  getSigner(address?: string) {
+    return this.provider.getSigner(address);
+  }
+
+  getDefaultSigner() {
+    return this.provider.getSigner();
+  }
+
+/*
   getDefaultAccount() {
     if (this.web3Instance.eth.defaultAccount === null) {
       throw "DefaultAccount is null";
@@ -96,6 +99,7 @@ export abstract class DelphinusWeb3 {
       web3: this.web3Instance,
     };
   }
+*/
 
   /**
    * Creates a new contract instance with all its methods and events
@@ -103,37 +107,33 @@ export abstract class DelphinusWeb3 {
    * @constructor
    * @param {AbiItem[] | AbiItem} jsonInterface - The json interface for the contract to instantiate.
    * @param {string} address - The address of the smart contract to call.
-   * @param {string} account - The address transactions should be made from.
+   * @param {string} accountAddress - The address transactions should be made from.
    */
-  getContract(jsonInterface: any, address: string, account?: string) {
+  getContract(jsonInterface: any, address: string, accountAddress?: string) {
     return new DelphinusContract(
       this,
       jsonInterface,
       address,
-      account || this.getDefaultAccount()
+      this.getSigner(accountAddress)
     );
   }
 }
 
-export class Web3BrowsersMode extends DelphinusWeb3 {
-  provider: MetaMaskInpageProvider;
+export class DelphinusBrowserProvider extends DelphinusProvider {
+  metamaskProvider: MetaMaskInpageProvider;
 
   constructor() {
     if (!window.ethereum) {
       throw "MetaMask not installed, Browser mode is not available.";
     }
 
-    super(new Web3(window.ethereum as any), undefined);
-    this.provider = window.ethereum as MetaMaskInpageProvider;
+    super(new ethers.providers.Web3Provider(window.ethereum as any, "any"));
+    this.metamaskProvider = window.ethereum as MetaMaskInpageProvider;
   }
 
   async connect() {
-    await this.provider.request({ method: "eth_requestAccounts" });
-    let accounts = await this.web3Instance.eth.getAccounts();
-    this.setDefaultAccount(accounts[0]);
+    await this.metamaskProvider.request({ method: "eth_requestAccounts" });
   }
-
-  async close() {}
 
   async subscribeAccountChange<T>(cb: (account: string) => T) {
     this.provider.on("accountsChanged", (...accounts: unknown[]) => {
@@ -147,14 +147,14 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
     console.log("switch chain", idHex, chainHexId);
     if (idHex != chainHexId) {
       try {
-        await this.provider.request({
+        await this.metamaskProvider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: chainHexId }],
         });
       } catch (e: any) {
         if (e.code == 4902) {
           try {
-            await this.provider.request({
+            await this.metamaskProvider.request({
               method: "wallet_addEthereumChain",
               params: [
                 {
@@ -164,7 +164,7 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
                 },
               ],
             });
-            await this.provider.request({
+            await this.metamaskProvider.request({
               method: "wallet_switchEthereumChain",
               params: [{ chainId: chainHexId }],
             });
@@ -181,23 +181,17 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
   }
 }
 
-export class Web3ProviderMode extends DelphinusWeb3 {
+export class DelphinusRpcProvider extends DelphinusProvider {
   readonly monitorAccount: string;
-  readonly delphinusProvider: DelphinusProvider;
 
   constructor(config: MonitorMode) {
-    super(new Web3(config.provider.provider));
+    super(new ethers.providers.JsonRpcProvider(config.chainRpc));
 
-    this.delphinusProvider = config.provider;
     this.monitorAccount = config.monitorAccount;
-    super.setDefaultAccount(config.monitorAccount);
+    //FIXME: inject monitor account to somewhere
   }
 
   async connect() {}
-
-  async close() {
-    await this.delphinusProvider.close();
-  }
 
   async switchNet(
     chainHexId: string,
@@ -207,33 +201,33 @@ export class Web3ProviderMode extends DelphinusWeb3 {
 }
 
 export interface MonitorMode {
-  provider: DelphinusProvider;
   monitorAccount: string;
+  chainRpc: string;
 }
 
 async function withDelphinusWeb3<t>(
-  web3: DelphinusWeb3,
-  cb: (web3: DelphinusWeb3) => Promise<t>
+  provider: DelphinusProvider,
+  cb: (provider: DelphinusProvider) => Promise<t>
 ) {
-  await web3.connect();
+  await provider.connect();
   try {
-    return await cb(web3);
+    return await cb(provider);
   } finally {
-    await web3.close();
+    await provider.close();
   }
 }
 
 export async function withBrowerWeb3<t>(
-  cb: (web3: DelphinusWeb3) => Promise<t>
+  cb: (provider: DelphinusProvider) => Promise<t>
 ) {
-  let web3 = new Web3BrowsersMode();
+  let web3 = new DelphinusBrowserProvider();
   return await withDelphinusWeb3(web3, cb);
 }
 
 export async function withProviderWeb3<t>(
   config: MonitorMode,
-  cb: (web3: DelphinusWeb3) => Promise<t>
+  cb: (web3: DelphinusProvider) => Promise<t>
 ) {
-  let web3 = new Web3ProviderMode(config);
+  let web3 = new DelphinusRpcProvider(config);
   return await withDelphinusWeb3(web3, cb);
 }

@@ -1,7 +1,6 @@
 import { Collection, Document } from "mongodb";
 import { EventData } from "web3-eth-contract";
-import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
-import { DelphinusWsProvider } from "./provider";
+import { DelphinusContract, DelphinusProvider, DelphinusRpcProvider } from "./client";
 import { DBHelper, withDBHelper } from "./dbhelper";
 
 // TODO: replace any with real type
@@ -71,7 +70,7 @@ class EventDBHelper extends DBHelper {
 }
 
 export class EventTracker {
-  private readonly web3: DelphinusWeb3;
+  private readonly provider: DelphinusProvider;
   private readonly contract: DelphinusContract;
   private readonly address: string;
   private readonly dbUrl: string;
@@ -87,15 +86,15 @@ export class EventTracker {
     mongodbUrl: string
   ) {
     let providerConfig = {
-      provider: new DelphinusWsProvider(websocketSource),
+      chainRpc: websocketSource,
       monitorAccount: monitorAccount,
     };
-    let web3 = new Web3ProviderMode(providerConfig);
+    let provider = new DelphinusRpcProvider(providerConfig);
 
-    this.web3 = web3;
+    this.provider = provider;
     this.l1Events = getAbiEvents(dataJson.abi);
     this.address = dataJson.networks[networkId].address;
-    this.contract = web3.getContract(dataJson, this.address, monitorAccount);
+    this.contract = provider.getContract(dataJson, this.address, monitorAccount);
     this.dbUrl = mongodbUrl + "/" + networkId + this.address;
   }
 
@@ -133,6 +132,7 @@ export class EventTracker {
   }
 
   // For debug
+  /*
   async subscribePendingEvents() {
     //var subscription = this.web3.eth.subscribe('pendingTransactions',
     this.web3
@@ -141,6 +141,7 @@ export class EventTracker {
         console.log(transaction);
       });
   }
+  */
 
   private async resetEventsInfo(db: EventDBHelper) {
     let infoCollection = await db.getInfoCollection();
@@ -160,7 +161,7 @@ export class EventTracker {
   }
 
   async close() {
-    await this.web3.close();
+    await this.provider.close();
   }
 }
 
