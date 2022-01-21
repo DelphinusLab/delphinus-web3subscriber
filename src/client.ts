@@ -3,7 +3,7 @@ import { MetaMaskInpageProvider } from "@metamask/providers";
 import BN from "bn.js";
 import { ethers } from "ethers";
 
-export class DelphinusContractBase {
+export class DelphinusContract {
   private readonly contract: ethers.Contract;
   private readonly jsonInterface: any;
 
@@ -15,15 +15,12 @@ export class DelphinusContractBase {
   ) {
     this.jsonInterface = jsonInterface;
 
+    console.log(jsonInterface.abi);
     this.contract = new ethers.Contract(
       jsonInterface.abi,
       address,
       signer || delphinusProvider.provider
     );
-  }
-
-  getWeb3Contract() {
-    return this.contract;
   }
 
   getJsonInterface() {
@@ -39,11 +36,11 @@ export class DelphinusContractBase {
   address() {
     return this.contract.options.address;
   }
-}
 
-export class DelphinusContract extends DelphinusContractBase {
-  readonly [ key: string ]: ethers.ContractFunction | any;
-};
+  methods() {
+    return this.contract
+  }
+}
 
 export abstract class DelphinusProvider {
   provider: ethers.providers.JsonRpcProvider;
