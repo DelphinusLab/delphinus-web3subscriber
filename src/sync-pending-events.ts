@@ -1,3 +1,4 @@
+import { ethers } from "ethers";
 import { Collection, Document } from "mongodb";
 import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusProvider, DelphinusRpcProvider } from "./client";
@@ -15,11 +16,11 @@ function getAbiEvents(abiJson: any) {
 }
 
 // TODO: replace any with real type
-function buildEventValue(events: any, r: EventData) {
-  let event = events[r.event];
+function buildEventValue(events: any, r: ethers.Event) {
+  let event = events[r.event!];
   let v: any = {};
   event.inputs.forEach((i: any) => {
-    v[i.name] = r.returnValues[i.name];
+    v[i.name] = r.data[i.name];
   });
   return v;
 }
@@ -45,9 +46,9 @@ class EventDBHelper extends DBHelper {
   }
 
   // TODO: replace any with real type
-  async updateLastMonitorBlock(r: EventData, v: any) {
+  async updateLastMonitorBlock(r: ethers.Event, v: any) {
     let client = await this.getClient();
-    let eventCollection = await this.getOrCreateEventCollection(r.event);
+    let eventCollection = await this.getOrCreateEventCollection(r.event!);
     let infoCollection = await this.getInfoCollection();
 
     await client.withSession(async (session) => {
@@ -81,12 +82,12 @@ export class EventTracker {
   constructor(
     networkId: string,
     dataJson: any,
-    websocketSource: string,
+    httpSource: string,
     monitorAccount: string,
     mongodbUrl: string
   ) {
     let providerConfig = {
-      chainRpc: websocketSource,
+      chainRpc: httpSource,
       monitorAccount: monitorAccount,
     };
     let provider = new DelphinusRpcProvider(providerConfig);
@@ -114,7 +115,7 @@ export class EventTracker {
       console.log("blockHash:", r.blockHash);
       console.log("transactionHash:", r.transactionHash);
       let e = buildEventValue(this.l1Events, r);
-      await handlers(r.event, e, r.transactionHash);
+      await handlers(r.event!, e, r.transactionHash);
       await db.updateLastMonitorBlock(r, e);
     }
   }

@@ -15,10 +15,9 @@ export class DelphinusContract {
   ) {
     this.jsonInterface = jsonInterface;
 
-    console.log(jsonInterface.abi);
     this.contract = new ethers.Contract(
-      jsonInterface.abi,
       address,
+      jsonInterface.abi,
       signer || delphinusProvider.provider
     );
   }
@@ -28,9 +27,7 @@ export class DelphinusContract {
   }
 
   async getPastEventsFrom(fromBlock: number) {
-    return await this.contract.getPastEvents("allEvents", {
-      fromBlock: fromBlock,
-    });
+    return await this.contract.queryFilter({}, fromBlock)
   }
 
   address() {
