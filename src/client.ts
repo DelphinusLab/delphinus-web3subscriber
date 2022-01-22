@@ -8,6 +8,22 @@ import { ethers } from "ethers";
 
 import { DelphinusProvider } from "./provider";
 
+export class DelphinusContractEther {
+  private contract: ethers.Contract;
+
+  constructor(address: string, jsonABI: any, provider: BlockChainClient) {
+    this.contract = new ethers.Contract(
+      address,
+      jsonABI.abi,
+      provider.getSignerOrProvider()
+    );
+  }
+
+  async call(method: string, ...args: any[]) {
+    return await this.contract[method](...args);
+  }
+}
+
 export class DelphinusContract {
   private readonly contract: Contract;
   private readonly jsonInterface: any;
@@ -233,7 +249,7 @@ export abstract class BlockChainClient {
 
   async getAccountInfo() {
     const address = await this.provider.getSigner().getAddress();
-    const id = (await this.provider.getNetwork()).chainId;
+    const id = this.getChainID();
 
     return {
       address: address,
@@ -241,8 +257,20 @@ export abstract class BlockChainClient {
     };
   }
 
+  async getChainID() {
+    return (await this.provider.getNetwork()).chainId;
+  }
+
   async send(method: string, params: any[]) {
     return this.provider.send(method, params);
+  }
+
+  async getContract(address: string, jsonABI: any) {
+    return new DelphinusContractEther(address, jsonABI, this);
+  }
+
+  getSignerOrProvider() {
+    return this.provider.getSigner() || this.provider;
   }
 }
 
@@ -267,7 +295,7 @@ export async function withBlockchainClient<t>(
   let client = browserOrUrl
     ? new BlockChainClientProvider(browserOrUrl)
     : new BlockChainClientBrowser();
-  return await cb(client);
+  return cb(client);
 }
 
 export async function withBrowerWeb3<t>(
