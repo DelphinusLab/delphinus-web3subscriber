@@ -240,6 +240,10 @@ export abstract class BlockChainClient {
       chainId: id.toString(),
     };
   }
+
+  async send(method: string, params: any[]) {
+    return this.provider.send(method, params);
+  }
 }
 
 class BlockChainClientBrowser extends BlockChainClient {
@@ -249,14 +253,20 @@ class BlockChainClientBrowser extends BlockChainClient {
   }
 }
 
-export async function withBlockchainClient<t>(
-  browser: boolean,
-  cb: (blockchain: BlockChainClient) => Promise<t>
-) {
-  if (!browser) {
-    throw "not impl";
+class BlockChainClientProvider extends BlockChainClient {
+  constructor(rpcUrl: string) {
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    super(provider);
   }
-  let client = new BlockChainClientBrowser();
+}
+
+export async function withBlockchainClient<t>(
+  cb: (blockchain: BlockChainClient) => Promise<t>,
+  browserOrUrl?: string
+) {
+  let client = browserOrUrl
+    ? new BlockChainClientProvider(browserOrUrl)
+    : new BlockChainClientBrowser();
   return await cb(client);
 }
 
