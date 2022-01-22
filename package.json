@@ -26,6 +26,7 @@
     "@truffle/hdwallet-provider": "^1.6.0",
     "@types/bn.js": "^5.1.0",
     "bn.js": "^5.2.0",
+    "ethers": "^5.5.3",
     "mongodb": "^4.1.4",
     "substrate-ss58": "^1.0.3",
     "web3": "1.5.3",

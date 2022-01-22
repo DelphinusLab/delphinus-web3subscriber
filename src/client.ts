@@ -4,6 +4,7 @@ import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
 import BN from "bn.js";
+import { ethers } from "ethers";
 
 import { DelphinusProvider } from "./provider";
 
@@ -221,6 +222,42 @@ async function withDelphinusWeb3<t>(
   } finally {
     await web3.close();
   }
+}
+
+export abstract class BlockChainClient {
+  private readonly provider: ethers.providers.JsonRpcProvider;
+
+  constructor(provider: ethers.providers.JsonRpcProvider) {
+    this.provider = provider;
+  }
+
+  async getAccountInfo() {
+    const address = await this.provider.getSigner().getAddress();
+    const id = (await this.provider.getNetwork()).chainId;
+
+    return {
+      address: address,
+      chainId: id.toString(),
+    };
+  }
+}
+
+class BlockChainClientBrowser extends BlockChainClient {
+  constructor() {
+    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+    super(provider);
+  }
+}
+
+export async function withBlockchainClient<t>(
+  browser: boolean,
+  cb: (blockchain: BlockChainClient) => Promise<t>
+) {
+  if (!browser) {
+    throw "not impl";
+  }
+  let client = new BlockChainClientBrowser();
+  return await cb(client);
 }
 
 export async function withBrowerWeb3<t>(
