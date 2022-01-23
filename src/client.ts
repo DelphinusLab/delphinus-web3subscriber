@@ -7,6 +7,7 @@ import BN from "bn.js";
 import { ethers } from "ethers";
 
 import { DelphinusProvider } from "./provider";
+import { encodeL1address } from "./addresses";
 
 export class DelphinusContractEther {
   private contract: ethers.Contract;
@@ -248,13 +249,7 @@ export abstract class BlockChainClient {
   }
 
   async getAccountInfo() {
-    const address = await this.provider.getSigner().getAddress();
-    const id = this.getChainID();
-
-    return {
-      address: address,
-      chainId: id.toString(),
-    };
+    return await this.provider.getSigner().getAddress();
   }
 
   async getChainID() {
@@ -271,6 +266,21 @@ export abstract class BlockChainClient {
 
   getSignerOrProvider() {
     return this.provider.getSigner() || this.provider;
+  }
+
+  /**
+   *
+   * @param address address must start with 0x
+   * @returns
+   */
+  async encodeL1Address(address: string) {
+    if (address.substring(0, 2) != "0x") {
+      throw "address must start with 0x";
+    }
+
+    const addressHex = address.substring(2);
+    const chex = (await this.getChainID()).toString();
+    return encodeL1address(addressHex, chex);
   }
 }
 
