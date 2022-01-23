@@ -23,6 +23,10 @@ export class DelphinusContractEther {
   async call(method: string, ...args: any[]) {
     return await this.contract[method](...args);
   }
+
+  address() {
+    return this.contract.address;
+  }
 }
 
 export class DelphinusContract {
