@@ -4,8 +4,30 @@ import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
 import BN from "bn.js";
+import { ethers } from "ethers";
 
 import { DelphinusProvider } from "./provider";
+import { encodeL1address } from "./addresses";
+
+export class DelphinusContractEther {
+  private contract: ethers.Contract;
+
+  constructor(address: string, jsonABI: any, provider: BlockChainClient) {
+    this.contract = new ethers.Contract(
+      address,
+      jsonABI.abi,
+      provider.getSignerOrProvider()
+    );
+  }
+
+  async call(method: string, ...args: any[]) {
+    return await this.contract[method](...args);
+  }
+
+  address() {
+    return this.contract.address;
+  }
+}
 
 export class DelphinusContract {
   private readonly contract: Contract;
@@ -221,6 +243,73 @@ async function withDelphinusWeb3<t>(
   } finally {
     await web3.close();
   }
+}
+
+export abstract class BlockChainClient {
+  private readonly provider: ethers.providers.JsonRpcProvider;
+
+  constructor(provider: ethers.providers.JsonRpcProvider) {
+    this.provider = provider;
+  }
+
+  async getAccountInfo() {
+    return await this.provider.getSigner().getAddress();
+  }
+
+  async getChainID() {
+    return (await this.provider.getNetwork()).chainId;
+  }
+
+  async send(method: string, params: any[]) {
+    return this.provider.send(method, params);
+  }
+
+  async getContract(address: string, jsonABI: any) {
+    return new DelphinusContractEther(address, jsonABI, this);
+  }
+
+  getSignerOrProvider() {
+    return this.provider.getSigner() || this.provider;
+  }
+
+  /**
+   *
+   * @param address address must start with 0x
+   * @returns
+   */
+  async encodeL1Address(address: string) {
+    if (address.substring(0, 2) != "0x") {
+      throw "address must start with 0x";
+    }
+
+    const addressHex = address.substring(2);
+    const chex = (await this.getChainID()).toString();
+    return encodeL1address(addressHex, chex);
+  }
+}
+
+class BlockChainClientBrowser extends BlockChainClient {
+  constructor() {
+    const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+    super(provider);
+  }
+}
+
+class BlockChainClientProvider extends BlockChainClient {
+  constructor(rpcUrl: string) {
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    super(provider);
+  }
+}
+
+export async function withBlockchainClient<t>(
+  cb: (blockchain: BlockChainClient) => Promise<t>,
+  browserOrUrl?: string
+) {
+  let client = browserOrUrl
+    ? new BlockChainClientProvider(browserOrUrl)
+    : new BlockChainClientBrowser();
+  return cb(client);
 }
 
 export async function withBrowerWeb3<t>(
