@@ -359,13 +359,28 @@ class BlockChainClientProvider extends BlockChainClient {
   ) {}
 }
 
+export interface SwitchChainInfo {
+  chainName: string;
+  chainId: number;
+  chainRpcUrl: string;
+}
+
 export async function withBlockchainClient<t>(
   cb: (blockchain: BlockChainClient) => Promise<t>,
-  browserOrUrl?: string
+  browserMode: boolean,
+  specifyChain?: SwitchChainInfo
 ) {
-  let client = browserOrUrl
-    ? new BlockChainClientProvider(browserOrUrl)
-    : new BlockChainClientBrowser();
+  let client = browserMode
+    ? new BlockChainClientBrowser()
+    : new BlockChainClientProvider(specifyChain!.chainRpcUrl);
+
+  if (specifyChain)
+    await client.switchNet(
+      specifyChain.chainId,
+      specifyChain.chainName,
+      specifyChain.chainRpcUrl
+    );
+
   return cb(client);
 }
 
