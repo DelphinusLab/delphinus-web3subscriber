@@ -252,6 +252,12 @@ export abstract class BlockChainClient {
     this.provider = provider;
   }
 
+  abstract switchNet(
+    switchToChainId: number,
+    chainName: string,
+    rpcSource: string
+  ): Promise<void>;
+
   async getAccountInfo() {
     return await this.provider.getSigner().getAddress();
   }
@@ -289,9 +295,54 @@ export abstract class BlockChainClient {
 }
 
 class BlockChainClientBrowser extends BlockChainClient {
+  private externalProvider: ethers.providers.ExternalProvider;
+
   constructor() {
     const provider = new ethers.providers.Web3Provider(window.ethereum as any);
     super(provider);
+    this.externalProvider = window.ethereum as any;
+  }
+
+  async switchNet(
+    switchToChainId: number,
+    chainName: string,
+    rpcSource: string
+  ) {
+    let currentChainId = await this.getChainID();
+    console.log("switch chain", currentChainId, switchToChainId);
+    if (currentChainId != switchToChainId) {
+      try {
+        await this.externalProvider.request!({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: switchToChainId }],
+        });
+      } catch (e: any) {
+        if (e.code == 4902) {
+          try {
+            await this.externalProvider.request!({
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: switchToChainId,
+                  chainName: chainName,
+                  rpcUrls: [rpcSource],
+                },
+              ],
+            });
+            await this.externalProvider.request!({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: switchToChainId }],
+            });
+          } catch (e) {
+            throw new Error("Add Network Rejected by User.");
+          }
+        } else {
+          throw new Error("Can not switch to chain " + switchToChainId);
+        }
+      }
+    }
+    currentChainId = await this.getChainID();
+    console.log("switched", currentChainId, switchToChainId);
   }
 }
 
@@ -300,6 +351,12 @@ class BlockChainClientProvider extends BlockChainClient {
     const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
     super(provider);
   }
+
+  async switchNet(
+    _switchToChainId: number,
+    _chainName: string,
+    _rpcSource: string
+  ) {}
 }
 
 export async function withBlockchainClient<t>(
