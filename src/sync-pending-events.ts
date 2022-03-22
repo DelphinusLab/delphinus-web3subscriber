@@ -1,7 +1,7 @@
 import { Collection, Document } from "mongodb";
 import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
-import { DelphinusWsProvider } from "./provider";
+import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
 
 // TODO: replace any with real type
@@ -82,12 +82,12 @@ export class EventTracker {
   constructor(
     networkId: string,
     dataJson: any,
-    websocketSource: string,
+    source: string,
     monitorAccount: string,
     mongodbUrl: string
   ) {
     let providerConfig = {
-      provider: new DelphinusWsProvider(websocketSource),
+      provider: new DelphinusHttpProvider(source),
       monitorAccount: monitorAccount,
     };
     let web3 = new Web3ProviderMode(providerConfig);
@@ -105,7 +105,9 @@ export class EventTracker {
   ) {
     let lastblock = await db.getLastMonitorBlock();
     console.log("sync from ", lastblock);
+    try {
     let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
+    console.log("sync from ", lastblock, "done");
     for (let r of pastEvents) {
       console.log(
         "========================= Get L1 Event: %s ========================",
@@ -117,6 +119,9 @@ export class EventTracker {
       let e = buildEventValue(this.l1Events, r);
       await handlers(r.event, e, r.transactionHash);
       await db.updateLastMonitorBlock(r, e);
+    }
+    } catch (err) {
+	console.log("%s", err);
     }
   }
 
@@ -167,7 +172,7 @@ export class EventTracker {
 export async function withEventTracker(
   networkId: string,
   dataJson: any,
-  websocketSource: string,
+  source: string,
   monitorAccount: string,
   mongodbUrl: string,
   cb: (eventTracker: EventTracker) => Promise<void>
@@ -175,7 +180,7 @@ export async function withEventTracker(
   let eventTracker = new EventTracker(
     networkId,
     dataJson,
-    websocketSource,
+    source,
     monitorAccount,
     mongodbUrl
   );
