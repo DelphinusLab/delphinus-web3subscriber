@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { Contract, EventData } from "web3-eth-contract";
+import { Contract } from "web3-eth-contract";
 import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
@@ -10,9 +10,6 @@ import { DelphinusProvider } from "./provider";
 export class DelphinusContract {
   private readonly contract: Contract;
   private readonly jsonInterface: any;
-  public static contractAPITimeOut: number = 10000; //10 seconds
-  protected static timeoutHandlerDict: {[id: number] : NodeJS.Timeout} = {};
-  protected static timeOutId: number = 0;
 
   constructor(
     web3Instance: DelphinusWeb3,
@@ -39,37 +36,10 @@ export class DelphinusContract {
     return this.jsonInterface;
   }
 
-  promiseWithTimeout<T>(
-    promise: Promise<T>,
-    ms: number,
-    timeoutError:string
-  ): Promise<T> {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      var timeoutHandler = setTimeout(() => {
-        reject(new Error(timeoutError));
-      }, ms);
-      DelphinusContract.timeoutHandlerDict[DelphinusContract.timeOutId++] = timeoutHandler;
-    });
-  
-    // returns a race between timeout and the passed promise
-    return Promise.race<T>([promise, timeoutPromise]);
-  }
-
   async getPastEventsFrom(fromBlock: number) {
-    const getPastEventsPromise = this.contract.getPastEvents("allEvents", {
+    return await this.contract.getPastEvents("allEvents", {
       fromBlock: fromBlock,
     });
-    
-    try {
-      const currentTimeOutId = DelphinusContract.timeOutId;
-      const result = await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
-      clearTimeout(DelphinusContract.timeoutHandlerDict[currentTimeOutId]);
-      return result;
-    }
-    catch (e) {
-      console.log("Exist Process: ", e)
-      process.exit(1);
-    }
   }
 
   address() {
