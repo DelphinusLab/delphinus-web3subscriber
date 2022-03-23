@@ -57,13 +57,6 @@ export class DelphinusContract {
         return value;
       }
     )
-    .catch(
-      (error) => {
-        //throw error;
-        console.log("Exist Process: ", error)
-        process.exit(1);
-      }
-    ); 
   }
 
   async getPastEventsFrom(fromBlock: number) {
@@ -71,7 +64,14 @@ export class DelphinusContract {
       fromBlock: fromBlock,
     });
     
-    return await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
+    try{
+      return await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
+    }
+    catch(e)
+    {
+      console.log("Exit Process: ", e);
+      process.exit(1);
+    }
   }
 
   address() {
