@@ -11,8 +11,6 @@ export class DelphinusContract {
   private readonly contract: Contract;
   private readonly jsonInterface: any;
   public static contractAPITimeOut: number = 10000; //10 seconds
-  protected static timeoutHandlerDict: {[id: number] : NodeJS.Timeout} = {};
-  protected static timeOutId: number = 0;
 
   constructor(
     web3Instance: DelphinusWeb3,
@@ -43,16 +41,29 @@ export class DelphinusContract {
     promise: Promise<T>,
     ms: number,
     timeoutError:string
-  ): Promise<T> {
+  ){
+    var timeoutHandler: NodeJS.Timeout;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      var timeoutHandler = setTimeout(() => {
+      timeoutHandler = setTimeout(() => {
         reject(new Error(timeoutError));
       }, ms);
-      DelphinusContract.timeoutHandlerDict[DelphinusContract.timeOutId++] = timeoutHandler;
     });
   
     // returns a race between timeout and the passed promise
-    return Promise.race<T>([promise, timeoutPromise]);
+    return Promise.race<T>([promise, timeoutPromise])
+    .then(
+      (value) => {
+        clearTimeout(timeoutHandler);
+        return value;
+      }
+    )
+    .catch(
+      (error) => {
+        //throw error;
+        console.log("Exist Process: ", error)
+        process.exit(1);
+      }
+    ); 
   }
 
   async getPastEventsFrom(fromBlock: number) {
@@ -60,16 +71,7 @@ export class DelphinusContract {
       fromBlock: fromBlock,
     });
     
-    try {
-      const currentTimeOutId = DelphinusContract.timeOutId;
-      const result = await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
-      clearTimeout(DelphinusContract.timeoutHandlerDict[currentTimeOutId]);
-      return result;
-    }
-    catch (e) {
-      console.log("Exist Process: ", e)
-      process.exit(1);
-    }
+    return await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
   }
 
   address() {
