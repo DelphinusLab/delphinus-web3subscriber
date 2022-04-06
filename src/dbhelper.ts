@@ -2,16 +2,18 @@ import { MongoClient, Db } from "mongodb";
 
 export class DBHelper {
   private readonly url: string;
+  private readonly name: string;
   private client?: MongoClient;
   private db?: Db;
 
-  constructor(url: string) {
+  constructor(url: string, n: string) {
     this.url = url;
+    this.name = n;
   }
 
   async connect() {
     this.client = await MongoClient.connect(this.url);
-    this.db = this.client.db();
+    this.db = this.client.db(this.name);
   }
 
   protected getDb() {
@@ -34,13 +36,17 @@ export class DBHelper {
     await this.client?.close();
   }
 
-  protected async getOrCreateEventCollection(eventName: string) {
+  protected async getOrCreateEventCollection(eventName: string, index?: any) {
     let db = this.getDb();
     let collections = await db.listCollections({ name: eventName }).toArray();
 
     if (collections.length == 0) {
       console.log("Init collection: ", eventName);
-      return await db.createCollection(eventName);
+      let c = await db.createCollection(eventName);
+      if (index !== undefined) {
+          c.createIndex(index, {unique: true});
+      }
+      return c;
     } else {
       return db.collection(eventName);
     }
@@ -52,9 +58,10 @@ type AConstructorTypeOf<T> = new (...args: any[]) => T;
 export async function withDBHelper<T extends DBHelper, R>(
   Ctor: AConstructorTypeOf<T>,
   uri: string,
+  n: string,
   cb: (db: T) => Promise<R>
 ) {
-  let db = new Ctor(uri);
+  let db = new Ctor(uri, n);
   try {
     await db.connect();
   } catch (e) {

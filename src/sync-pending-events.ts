@@ -75,6 +75,7 @@ export class EventTracker {
   private readonly contract: DelphinusContract;
   private readonly address: string;
   private readonly dbUrl: string;
+  private readonly dbName: string;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -96,7 +97,8 @@ export class EventTracker {
     this.l1Events = getAbiEvents(dataJson.abi);
     this.address = dataJson.networks[networkId].address;
     this.contract = web3.getContract(dataJson, this.address, monitorAccount);
-    this.dbUrl = mongodbUrl + "/" + networkId + this.address;
+    this.dbUrl = mongodbUrl;
+    this.dbName = networkId + this.address;
   }
 
   private async syncPastEvents(
@@ -131,6 +133,7 @@ export class EventTracker {
     await withDBHelper(
       EventDBHelper,
       this.dbUrl,
+      this.dbName,
       async (dbhelper: EventDBHelper) => {
         await this.syncPastEvents(handlers, dbhelper);
       }
@@ -158,6 +161,7 @@ export class EventTracker {
     await withDBHelper(
       EventDBHelper,
       this.dbUrl,
+      this.dbName,
       async (dbhelper: EventDBHelper) => {
         await this.resetEventsInfo(dbhelper);
       }
