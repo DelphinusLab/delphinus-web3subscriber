@@ -41,9 +41,10 @@ export class PromiseBinder {
    */
   return(p: () => any) {
     var self = this;
-    let promise = p();
+    let promise: any = (new Promise((f) => setTimeout(f, 2000))).then(()=>p());
     /*
      * FIXME: promise.when may happen after actions to be bind.
+     * Current we just add a 2 second delay, which means we assume the .when register should be done in 2 seconds after the return() called.
      */
     promise.when = (action: string, c: string, fn: (_: any) => void) => {
       if (self.actions[action] == undefined) {
