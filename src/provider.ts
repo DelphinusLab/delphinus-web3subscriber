@@ -32,6 +32,9 @@ export class DelphinusHttpProvider extends DelphinusProvider {
 }
 
 export class DelphinusHDWalletProvider extends DelphinusProvider {
+  public errHDWalletProvider:any;
+  public connected: boolean;
+
   constructor(privateKey: string, url: string) {
     super(
       new HDWalletProvider({
@@ -41,10 +44,18 @@ export class DelphinusHDWalletProvider extends DelphinusProvider {
       })
     );
 
+    this.errHDWalletProvider = null;
+    this.connected = false;
+
+    // TODO: Need find the a way to set connected to true. Haven't found the api how to do it.
+    // like (this.provider as HDWalletProvider).engine.on("connected", () => { this.connected = true;};
+
     // TODO: Exit a process is not appropriate since it's a lib!
     (this.provider as HDWalletProvider).engine.on("error", (err: any) => {
       console.info("HDWalletProvider connection error, process exiting...");
       console.log(err);
+      this.errHDWalletProvider = err;
+      this.close();
       process.exit(-1);
     });
   }
