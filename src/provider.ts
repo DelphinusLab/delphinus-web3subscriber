@@ -45,6 +45,7 @@ export class DelphinusHDWalletProvider extends DelphinusProvider {
     (this.provider as HDWalletProvider).engine.on("error", (err: any) => {
       console.info("HDWalletProvider connection error, process exiting...");
       console.log(err);
+      this.close();
       process.exit(-1);
     });
   }
