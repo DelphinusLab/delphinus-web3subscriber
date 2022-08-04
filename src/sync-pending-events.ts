@@ -3,6 +3,7 @@ import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
+import { sendAlert } from "./alerts-bot";
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -108,22 +109,23 @@ export class EventTracker {
     let lastblock = await db.getLastMonitorBlock();
     console.log("sync from ", lastblock);
     try {
-    let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
-    console.log("sync from ", lastblock, "done");
-    for (let r of pastEvents) {
-      console.log(
-        "========================= Get L1 Event: %s ========================",
-        r.event
-      );
-      console.log("blockNumber:", r.blockNumber);
-      console.log("blockHash:", r.blockHash);
-      console.log("transactionHash:", r.transactionHash);
-      let e = buildEventValue(this.l1Events, r);
-      await handlers(r.event, e, r.transactionHash);
-      await db.updateLastMonitorBlock(r, e);
-    }
+      let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
+      console.log("sync from ", lastblock, "done");
+      for (let r of pastEvents) {
+        console.log(
+          "========================= Get L1 Event: %s ========================",
+          r.event
+        );
+        console.log("blockNumber:", r.blockNumber);
+        console.log("blockHash:", r.blockHash);
+        console.log("transactionHash:", r.transactionHash);
+        let e = buildEventValue(this.l1Events, r);
+        await handlers(r.event, e, r.transactionHash);
+        await db.updateLastMonitorBlock(r, e);
+      }
     } catch (err) {
-	console.log("%s", err);
+      sendAlert(err);
+	    console.log("%s", err);
     }
   }
 
@@ -191,6 +193,8 @@ export async function withEventTracker(
 
   try {
     await cb(eventTracker);
+  } catch(e) {
+    sendAlert(e);
   } finally {
     await eventTracker.close();
   }
