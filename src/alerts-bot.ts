@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const channelId = "C03RK8Q37FY"; // "ID of monitor-alerts channel"
-const token = "xoxb-3511023054901-3869372105702-6YBG1pO8HTvkz0WhfrfSTjU5"; // The Bot User OAuth Token given by slack 
+const token = "xoxb-3511023054901-3869372105702-M0leS5Y2o8WlIjA4UVPrdAeo"; // The Bot User OAuth Token given by slack 
 const timePeriod = 60 * 5; // The allowed repeat interval of alert (unit: second)
 
 async function requestSlackHelper(method: string, url: string, params: any, data: any) {
