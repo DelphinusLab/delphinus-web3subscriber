@@ -3,7 +3,7 @@ import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
-import { sendAlert } from "./alerts-bot";
+import { sendAlert } from "delphinus-slack-alert/src/index";
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -195,6 +195,7 @@ export async function withEventTracker(
     await cb(eventTracker);
   } catch(e) {
     sendAlert(e);
+    console.log(e);
   } finally {
     await eventTracker.close();
   }

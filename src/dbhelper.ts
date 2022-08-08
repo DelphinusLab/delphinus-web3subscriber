@@ -1,5 +1,5 @@
 import { MongoClient, Db } from "mongodb";
-import { sendAlert } from "./alerts-bot";
+import { sendAlert } from "delphinus-slack-alert/src/index";
 
 export class DBHelper {
   private readonly url: string;
@@ -76,6 +76,7 @@ export async function withDBHelper<T extends DBHelper, R>(
     return await cb(db);
   } catch (e) {
     sendAlert(e);
+    console.log(e);
   } finally {
     await db.close();
   }
