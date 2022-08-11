@@ -4,7 +4,7 @@ import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
 import { sendAlert } from "delphinus-slack-alert/src/index";
-const SlackConfig = require("./slack-alert-config");
+const { SlackConfig } = require("./slack-alert-config");
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
