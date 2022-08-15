@@ -67,8 +67,7 @@ export async function withDBHelper<T extends DBHelper, R>(
   try {
     await db.connect();
   } catch (e) {
-    sendAlert(e, SlackConfig);
-    console.log(e);
+    sendAlert(e, SlackConfig, true);
     console.log("failed to connect with db, DBHelper exiting...");
     return;
   }
@@ -76,8 +75,7 @@ export async function withDBHelper<T extends DBHelper, R>(
   try {
     return await cb(db);
   } catch (e) {
-    sendAlert(e, SlackConfig);
-    console.log(e);
+    sendAlert(e, SlackConfig, true);
   } finally {
     await db.close();
   }

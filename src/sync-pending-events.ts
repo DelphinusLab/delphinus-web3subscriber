@@ -125,8 +125,7 @@ export class EventTracker {
         await db.updateLastMonitorBlock(r, e);
       }
     } catch (err) {
-      sendAlert(err, SlackConfig);
-	    console.log("%s", err);
+      sendAlert(err, SlackConfig, true);
     }
   }
 
@@ -195,8 +194,7 @@ export async function withEventTracker(
   try {
     await cb(eventTracker);
   } catch(e) {
-    sendAlert(e, SlackConfig);
-    console.log(e);
+    sendAlert(e, SlackConfig, true);
   } finally {
     await eventTracker.close();
   }
