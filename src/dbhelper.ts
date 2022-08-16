@@ -1,6 +1,6 @@
 import { MongoClient, Db } from "mongodb";
 import { sendAlert } from "delphinus-slack-alert/src/index";
-const SlackConfig = require("./slack-alert-config");
+const SlackConfig = require("../slack-alert-config");
 
 export class DBHelper {
   private readonly url: string;
