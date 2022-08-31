@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { Contract } from "web3-eth-contract";
+import { Contract, EventData } from "web3-eth-contract";
 import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
@@ -40,6 +40,24 @@ export class DelphinusContract {
     return await this.contract.getPastEvents("allEvents", {
       fromBlock: fromBlock,
     });
+  }
+
+  async getPastEventsFromTo(fromBlock: number, step: number) {
+    return await this.contract.getPastEvents("allEvents", {
+      fromBlock: fromBlock,
+      toBlock: `${fromBlock + step}`
+    });
+  }
+
+  async getPastEventsFromSteped(fromBlock: number, toBlock: number, step: number) {
+    let pastEvents = [];
+    let start = fromBlock;
+    while (start + step <= toBlock){
+      pastEvents.push(await this.getPastEventsFromTo(start, step));
+      start += step;
+    };
+    pastEvents.push(await this.getPastEventsFrom(start));
+    return pastEvents
   }
 
   address() {
