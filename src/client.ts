@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { Contract, EventData } from "web3-eth-contract";
+import { Contract } from "web3-eth-contract";
 import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
