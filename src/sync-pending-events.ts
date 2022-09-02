@@ -29,6 +29,7 @@ function buildEventValue(events: any, r: EventData) {
 /* Mongo Db helper to track all the recorded events handled so far */
 class EventDBHelper extends DBHelper {
   private infoCollection?: Collection<Document>;
+  // private latestBlockNumber?: Collection<Document>;
 
   async getInfoCollection() {
     if (!this.infoCollection) {
@@ -43,7 +44,24 @@ class EventDBHelper extends DBHelper {
     let infoCollection = await this.getInfoCollection();
 
     let rs = await infoCollection.findOne({ name: "LastUpdatedBlock" });
+    console.log(rs);
     return rs === null ? 0 : rs.lastblock;
+  }
+
+  async getLastCheckedBlockNumber() {
+    let infoCollection = await this.getInfoCollection();
+
+    let bn = await infoCollection.findOne({ name: "LastCheckedBlock" });
+    return bn === null ? 490000 : bn.lastblock;
+  }
+
+  async updateCheckedBlock(blockNumber:number){
+    let infoCollection = await this.getInfoCollection();
+    await infoCollection.updateOne(
+      { name: "LastCheckedBlock" },
+      { $set: { lastblock: blockNumber } },
+      { upsert: true }
+    );
   }
 
   // TODO: replace any with real type
@@ -108,12 +126,13 @@ export class EventTracker {
     handlers: (n: string, v: any, hash: string) => Promise<void>,
     db: EventDBHelper
   ) {
-    let lastblock = await db.getLastMonitorBlock();
+    // let lastblock = await db.getLastMonitorBlock();
+    let LastCheckedBlock = await db.getLastCheckedBlockNumber();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
-    console.log("sync from ", lastblock);
+    console.log("sync from ", LastCheckedBlock);
     try {
-    let pastEvents = await this.contract.getPastEventsFromSteped(lastblock + 1, latestBlockNumber, 2000000);
-    console.log("sync from ", lastblock, "done");
+    let pastEvents = await this.contract.getPastEventsFromSteped(LastCheckedBlock, latestBlockNumber, 2000);
+    console.log("sync from ", LastCheckedBlock, "done");
     for(let group of pastEvents){
       for (let r of group) {
         console.log(
@@ -128,6 +147,7 @@ export class EventTracker {
         await db.updateLastMonitorBlock(r, e);
       }
     }
+    await db.updateCheckedBlock(latestBlockNumber);
     } catch (err) {
 	console.log("%s", err);
     }

@@ -55,8 +55,11 @@ export class DelphinusContract {
     while (start + step <= toBlock){
       pastEvents.push(await this.getPastEventsFromTo(start, step));
       start += step;
+      console.log("getEvents from", start, "to", start + step);
     };
     pastEvents.push(await this.getPastEventsFrom(start));
+    console.log("getEvent from", start, " to", toBlock, " done");
+ 
     return pastEvents
   }
 
