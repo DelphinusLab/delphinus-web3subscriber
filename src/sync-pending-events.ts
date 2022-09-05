@@ -31,7 +31,6 @@ function buildEventValue(events: any, r: EventData) {
 /* Mongo Db helper to track all the recorded events handled so far */
 class EventDBHelper extends DBHelper {
   private infoCollection?: Collection<Document>;
-  // private latestBlockNumber?: Collection<Document>;
 
   async getInfoCollection() {
     if (!this.infoCollection) {
