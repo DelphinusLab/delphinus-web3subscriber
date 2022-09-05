@@ -122,7 +122,12 @@ export class EventTracker {
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
     this.source = source;
-    this.eventsSyncStep = eventsSyncStep;
+    const defaultStep = 2000;
+    if(eventsSyncStep == undefined || eventsSyncStep == 0){
+      this.eventsSyncStep = defaultStep;
+    }else{
+      this.eventsSyncStep = eventsSyncStep;
+    }
   }
 
   private async syncPastEvents(
