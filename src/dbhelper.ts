@@ -1,4 +1,6 @@
 import { MongoClient, Db } from "mongodb";
+import { sendAlert } from "delphinus-slack-alert/src/index";
+const SlackConfig = require("../slack-alert-config");
 
 export class DBHelper {
   private readonly url: string;
@@ -65,13 +67,15 @@ export async function withDBHelper<T extends DBHelper, R>(
   try {
     await db.connect();
   } catch (e) {
-    console.log(e);
+    sendAlert(e, SlackConfig, true);
     console.log("failed to connect with db, DBHelper exiting...");
     return;
   }
 
   try {
     return await cb(db);
+  } catch (e) {
+    sendAlert(e, SlackConfig, true);
   } finally {
     await db.close();
   }
