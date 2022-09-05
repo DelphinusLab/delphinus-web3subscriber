@@ -123,7 +123,7 @@ export class EventTracker {
     this.dbName = networkId + this.address;
     this.source = source;
     const defaultStep = 2000;
-    if(eventsSyncStep == undefined || eventsSyncStep == 0){
+    if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
     }else{
       this.eventsSyncStep = eventsSyncStep;
