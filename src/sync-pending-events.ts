@@ -96,6 +96,7 @@ export class EventTracker {
   private readonly dbUrl: string;
   private readonly dbName: string;
   private readonly source: string;
+  private readonly eventsSyncStep: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -105,7 +106,8 @@ export class EventTracker {
     dataJson: any,
     source: string,
     monitorAccount: string,
-    mongodbUrl: string
+    mongodbUrl: string,
+    eventsSyncStep: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -120,6 +122,7 @@ export class EventTracker {
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
     this.source = source;
+    this.eventsSyncStep = eventsSyncStep;
   }
 
   private async syncPastEvents(
@@ -138,7 +141,7 @@ export class EventTracker {
     }
     console.log("sync from ", checkFromBlockNumber);
     try {
-      let pastEvents = await this.contract.getPastEventsFromSteped(checkFromBlockNumber + 1, latestBlockNumber, 2000);
+      let pastEvents = await this.contract.getPastEventsFromSteped(checkFromBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
       console.log("sync from ", checkFromBlockNumber, "done");
       for(let group of pastEvents){
         for (let r of group) {
@@ -211,6 +214,7 @@ export async function withEventTracker(
   source: string,
   monitorAccount: string,
   mongodbUrl: string,
+  eventsSyncStep: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -218,7 +222,8 @@ export async function withEventTracker(
     dataJson,
     source,
     monitorAccount,
-    mongodbUrl
+    mongodbUrl,
+    eventsSyncStep
   );
 
   try {
