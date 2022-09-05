@@ -3,7 +3,9 @@ import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
+import { sendAlert } from "delphinus-slack-alert/src/index";
 import Web3 from "web3";
+const SlackConfig = require("../slack-alert-config");
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -137,24 +139,24 @@ export class EventTracker {
     }
     console.log("sync from ", checkFromBlockNumber);
     try {
-    let pastEvents = await this.contract.getPastEventsFromSteped(checkFromBlockNumber + 1, latestBlockNumber, 2000);
-    console.log("sync from ", checkFromBlockNumber, "done");
-    for(let group of pastEvents){
-      for (let r of group) {
-        console.log(
-          "========================= Get L1 Event: %s ========================",
-          r.event
-        );
-        console.log("blockNumber:", r.blockNumber);
-        console.log("blockHash:", r.blockHash);
-        console.log("transactionHash:", r.transactionHash);
-        let e = buildEventValue(this.l1Events, r);
-        await handlers(r.event, e, r.transactionHash);
-        await db.updateLastMonitorBlock(r, e);
+      let pastEvents = await this.contract.getPastEventsFromSteped(checkFromBlockNumber + 1, latestBlockNumber, 2000);
+      console.log("sync from ", checkFromBlockNumber, "done");
+      for(let group of pastEvents){
+        for (let r of group) {
+          console.log(
+            "========================= Get L1 Event: %s ========================",
+            r.event
+          );
+          console.log("blockNumber:", r.blockNumber);
+          console.log("blockHash:", r.blockHash);
+          console.log("transactionHash:", r.transactionHash);
+          let e = buildEventValue(this.l1Events, r);
+          await handlers(r.event, e, r.transactionHash);
+          await db.updateLastMonitorBlock(r, e);
+        }
       }
-    }
     } catch (err) {
-	console.log("%s", err);
+      sendAlert(err, SlackConfig, true);
     }
   }
 
@@ -222,6 +224,8 @@ export async function withEventTracker(
 
   try {
     await cb(eventTracker);
+  } catch(e) {
+    sendAlert(e, SlackConfig, true);
   } finally {
     await eventTracker.close();
   }
