@@ -42,24 +42,22 @@ export class DelphinusContract {
     });
   }
 
-  async getPastEventsFromTo(fromBlock: number, step: number) {
+  async getPastEventsFromTo(fromBlock: number, toBlock: number) {
     return await this.contract.getPastEvents("allEvents", {
       fromBlock: fromBlock,
-      toBlock: `${fromBlock + step}`
+      toBlock: toBlock
     });
   }
 
   async getPastEventsFromSteped(fromBlock: number, toBlock: number, step: number) {
     let pastEvents = [];
     let start = fromBlock;
-    while (start + step <= toBlock){
-      pastEvents.push(await this.getPastEventsFromTo(start, step));
+    while (start+step-1 <= toBlock){
+      pastEvents.push(await this.getPastEventsFromTo(start, start+step-1));
       start += step;
-      console.log("getEvents from", start, "to", start + step);
+      console.log("getEvents from", start, "to", start+step-1);
     };
     pastEvents.push(await this.getPastEventsFrom(start));
-    console.log("getEvent from", start, " to", toBlock, " done");
- 
     return pastEvents
   }
 

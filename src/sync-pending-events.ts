@@ -47,17 +47,17 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
-  async getLastCheckedBlockNumber() {
+  async getZeroEventCheckedBlockNumber() {
     let infoCollection = await this.getInfoCollection();
 
-    let bn = await infoCollection.findOne({ name: "LastCheckedBlock" });
+    let bn = await infoCollection.findOne({ name: "ZeroEventCheckedBlockNumber" });
     return bn === null ? 0 : bn.lastblock;
   }
 
-  async updateCheckedBlock(blockNumber:number){
+  async updateZeroEventCheckedBlockNumber(blockNumber:number){
     let infoCollection = await this.getInfoCollection();
     await infoCollection.updateOne(
-      { name: "LastCheckedBlock" },
+      { name: "ZeroEventCheckedBlockNumber" },
       { $set: { lastblock: blockNumber } },
       { upsert: true }
     );
@@ -125,19 +125,20 @@ export class EventTracker {
     handlers: (n: string, v: any, hash: string) => Promise<void>,
     db: EventDBHelper
   ) {
-    let zeroEventCheckedBlockNumber;
-    let lastblock = await db.getLastMonitorBlock();
-    let LastCheckedBlock = await db.getLastCheckedBlockNumber();
+    let checkFromBlockNumber;
+    let lastUpdatedBlock = await db.getLastMonitorBlock();
+    let zeroEventCheckedBlockNumber = await db.getZeroEventCheckedBlockNumber();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
-    if(lastblock == 0){
-      zeroEventCheckedBlockNumber = LastCheckedBlock;
+    if(lastUpdatedBlock == 0){
+      checkFromBlockNumber = zeroEventCheckedBlockNumber;
+      await db.updateZeroEventCheckedBlockNumber(latestBlockNumber);
     }else{
-      zeroEventCheckedBlockNumber = lastblock;
+      checkFromBlockNumber = lastUpdatedBlock;
     }
-    console.log("sync from ", zeroEventCheckedBlockNumber);
+    console.log("sync from ", checkFromBlockNumber);
     try {
-    let pastEvents = await this.contract.getPastEventsFromSteped(zeroEventCheckedBlockNumber + 1, latestBlockNumber, 2000);
-    console.log("sync from ", zeroEventCheckedBlockNumber, "done");
+    let pastEvents = await this.contract.getPastEventsFromSteped(checkFromBlockNumber + 1, latestBlockNumber, 2000);
+    console.log("sync from ", checkFromBlockNumber, "done");
     for(let group of pastEvents){
       for (let r of group) {
         console.log(
@@ -152,7 +153,6 @@ export class EventTracker {
         await db.updateLastMonitorBlock(r, e);
       }
     }
-    await db.updateCheckedBlock(latestBlockNumber);
     } catch (err) {
 	console.log("%s", err);
     }
