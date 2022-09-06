@@ -3,8 +3,6 @@ import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
-import { sendAlert } from "delphinus-slack-alert/src/index";
-const SlackConfig = require("../slack-alert-config");
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -125,7 +123,7 @@ export class EventTracker {
         await db.updateLastMonitorBlock(r, e);
       }
     } catch (err) {
-      sendAlert(err, SlackConfig, true);
+      console.log("%s", err);
     }
   }
 
@@ -193,8 +191,6 @@ export async function withEventTracker(
 
   try {
     await cb(eventTracker);
-  } catch(e) {
-    sendAlert(e, SlackConfig, true);
   } finally {
     await eventTracker.close();
   }
