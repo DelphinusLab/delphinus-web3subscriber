@@ -108,22 +108,23 @@ export class EventTracker {
     let lastblock = await db.getLastMonitorBlock();
     console.log("sync from ", lastblock);
     try {
-    let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
-    console.log("sync from ", lastblock, "done");
-    for (let r of pastEvents) {
-      console.log(
-        "========================= Get L1 Event: %s ========================",
-        r.event
-      );
-      console.log("blockNumber:", r.blockNumber);
-      console.log("blockHash:", r.blockHash);
-      console.log("transactionHash:", r.transactionHash);
-      let e = buildEventValue(this.l1Events, r);
-      await handlers(r.event, e, r.transactionHash);
-      await db.updateLastMonitorBlock(r, e);
-    }
+      let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
+      console.log("sync from ", lastblock, "done");
+      for (let r of pastEvents) {
+        console.log(
+          "========================= Get L1 Event: %s ========================",
+          r.event
+        );
+        console.log("blockNumber:", r.blockNumber);
+        console.log("blockHash:", r.blockHash);
+        console.log("transactionHash:", r.transactionHash);
+        let e = buildEventValue(this.l1Events, r);
+        await handlers(r.event, e, r.transactionHash);
+        await db.updateLastMonitorBlock(r, e);
+      }
     } catch (err) {
-	console.log("%s", err);
+	    console.log("%s", err);
+      throw(err);
     }
   }
 
@@ -191,7 +192,10 @@ export async function withEventTracker(
 
   try {
     await cb(eventTracker);
-  } finally {
+  } catch(e) {
+    throw(e);
+  }
+  finally {
     await eventTracker.close();
   }
 }
