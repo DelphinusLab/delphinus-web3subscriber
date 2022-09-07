@@ -123,7 +123,7 @@ export class EventTracker {
         await db.updateLastMonitorBlock(r, e);
       }
     } catch (err) {
-	    console.log("%s", err);
+      console.log("%s", err);
       throw(err);
     }
   }
@@ -194,8 +194,7 @@ export async function withEventTracker(
     await cb(eventTracker);
   } catch(e) {
     throw(e);
-  }
-  finally {
+  } finally {
     await eventTracker.close();
   }
 }

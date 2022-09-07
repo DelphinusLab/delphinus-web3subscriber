@@ -68,14 +68,13 @@ export async function withDBHelper<T extends DBHelper, R>(
     console.log(e);
     console.log("failed to connect with db, DBHelper exiting...");
     throw(e);
-    return;
   }
 
   try {
     return await cb(db);
   } catch(e) {
     throw(e);
-  }finally {
+  } finally {
     await db.close();
   }
 }
