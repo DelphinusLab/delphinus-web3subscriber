@@ -124,6 +124,7 @@ export class EventTracker {
       }
     } catch (err) {
       console.log("%s", err);
+      throw(err);
     }
   }
 
@@ -191,6 +192,8 @@ export async function withEventTracker(
 
   try {
     await cb(eventTracker);
+  } catch(e) {
+    throw(e);
   } finally {
     await eventTracker.close();
   }
