@@ -138,7 +138,6 @@ export class EventTracker {
     let latestBlockNumber = await getLatestBlockNumber(this.source);
     if(lastUpdatedBlock == 0){
       checkFromBlockNumber = zeroEventCheckedBlockNumber;
-      await db.updateZeroEventCheckedBlockNumber(latestBlockNumber);
     }else{
       checkFromBlockNumber = lastUpdatedBlock;
     }
@@ -159,6 +158,10 @@ export class EventTracker {
           await handlers(r.event, e, r.transactionHash);
           await db.updateLastMonitorBlock(r, e);
         }
+      }
+      lastUpdatedBlock = await db.getLastMonitorBlock();
+      if(lastUpdatedBlock == 0){
+        await db.updateZeroEventCheckedBlockNumber(latestBlockNumber);
       }
     } catch (err) {
       console.log("%s", err);
