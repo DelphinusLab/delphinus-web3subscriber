@@ -46,13 +46,6 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
-  // async getlastCheckedBlockNumber() {
-  //   let infoCollection = await this.getInfoCollection();
-
-  //   let bn = await infoCollection.findOne({ name: "LastUpdatedBlock" });
-  //   return bn === null ? 0 : bn.lastblock;
-  // }
-
   async updatelastCheckedBlockNumber(blockNumber:number){
     let infoCollection = await this.getInfoCollection();
     await infoCollection.updateOne(
