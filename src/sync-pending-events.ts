@@ -46,17 +46,17 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
-  async getlastCheckedBlockNumber() {
-    let infoCollection = await this.getInfoCollection();
+  // async getlastCheckedBlockNumber() {
+  //   let infoCollection = await this.getInfoCollection();
 
-    let bn = await infoCollection.findOne({ name: "lastCheckedBlockNumber" });
-    return bn === null ? 0 : bn.lastblock;
-  }
+  //   let bn = await infoCollection.findOne({ name: "LastUpdatedBlock" });
+  //   return bn === null ? 0 : bn.lastblock;
+  // }
 
   async updatelastCheckedBlockNumber(blockNumber:number){
     let infoCollection = await this.getInfoCollection();
     await infoCollection.updateOne(
-      { name: "lastCheckedBlockNumber" },
+      { name: "LastUpdatedBlock" },
       { $set: { lastblock: blockNumber } },
       { upsert: true }
     );
@@ -132,13 +132,12 @@ export class EventTracker {
     handlers: (n: string, v: any, hash: string) => Promise<void>,
     db: EventDBHelper
   ) {
-    // let lastUpdatedBlock = await db.getLastMonitorBlock();
-    let lastCheckedBlockNumber = await db.getlastCheckedBlockNumber();
+    let lastCheckedBlockNumber = await db.getLastMonitorBlock();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
-    console.log("sync from ", lastCheckedBlockNumber);
+    console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
       let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
-      console.log("sync from ", lastCheckedBlockNumber, "done");
+      console.log("sync from ", lastCheckedBlockNumber + 1, "done");
       for(let group of pastEvents.events){
         for (let r of group) {
           console.log(
@@ -153,11 +152,7 @@ export class EventTracker {
           await db.updateLastMonitorBlock(r, e);
         }
       }
-      if(pastEvents.breakpoint == 0){
-        await db.updatelastCheckedBlockNumber(latestBlockNumber);
-      }else{
-        await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
-      }
+      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
     } catch (err) {
       console.log("%s", err);
       throw(err);
