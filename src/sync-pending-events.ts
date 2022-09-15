@@ -88,6 +88,7 @@ export class EventTracker {
   private readonly dbName: string;
   private readonly source: string;
   private readonly eventsSyncStep: number;
+  private readonly networkId: string;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -113,6 +114,7 @@ export class EventTracker {
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
     this.source = source;
+    this.networkId = networkId;
     const defaultStep = 0;
     if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
@@ -127,6 +129,10 @@ export class EventTracker {
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
+    const bnInfo = require('../blockNumberBeforeDeployment.json');
+    if(lastCheckedBlockNumber < bnInfo[this.networkId]){
+      lastCheckedBlockNumber = bnInfo[this.networkId];
+    }
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
       let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
