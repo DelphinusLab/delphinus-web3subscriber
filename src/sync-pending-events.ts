@@ -88,7 +88,7 @@ export class EventTracker {
   private readonly dbName: string;
   private readonly source: string;
   private readonly eventsSyncStep: number;
-  private readonly networkId: string;
+  private readonly eventSyncStartingPoint: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -100,6 +100,7 @@ export class EventTracker {
     monitorAccount: string,
     mongodbUrl: string,
     eventsSyncStep: number,
+    eventSyncStartingPoint: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -114,7 +115,7 @@ export class EventTracker {
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
     this.source = source;
-    this.networkId = networkId;
+    this.eventSyncStartingPoint = eventSyncStartingPoint;
     const defaultStep = 0;
     if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
@@ -129,9 +130,9 @@ export class EventTracker {
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
-    const bnInfo = require('../blockNumberBeforeDeployment.json');
-    if(lastCheckedBlockNumber < bnInfo[this.networkId]){
-      lastCheckedBlockNumber = bnInfo[this.networkId];
+    if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
+      lastCheckedBlockNumber = this.eventSyncStartingPoint;
+      console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
     }
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
@@ -211,6 +212,7 @@ export async function withEventTracker(
   monitorAccount: string,
   mongodbUrl: string,
   eventsSyncStep: number,
+  eventSyncStartingPoint: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -219,7 +221,8 @@ export async function withEventTracker(
     source,
     monitorAccount,
     mongodbUrl,
-    eventsSyncStep
+    eventsSyncStep,
+    eventSyncStartingPoint,
   );
 
   try {
