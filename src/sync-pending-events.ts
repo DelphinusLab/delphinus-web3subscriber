@@ -88,6 +88,7 @@ export class EventTracker {
   private readonly dbName: string;
   private readonly source: string;
   private readonly eventsSyncStep: number;
+  private readonly eventSyncStartingPoint: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -99,6 +100,7 @@ export class EventTracker {
     monitorAccount: string,
     mongodbUrl: string,
     eventsSyncStep: number,
+    eventSyncStartingPoint: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -113,6 +115,7 @@ export class EventTracker {
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
     this.source = source;
+    this.eventSyncStartingPoint = eventSyncStartingPoint;
     const defaultStep = 0;
     if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
@@ -127,6 +130,10 @@ export class EventTracker {
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
+    if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
+      lastCheckedBlockNumber = this.eventSyncStartingPoint;
+      console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
+    }
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
       let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
@@ -205,6 +212,7 @@ export async function withEventTracker(
   monitorAccount: string,
   mongodbUrl: string,
   eventsSyncStep: number,
+  eventSyncStartingPoint: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -213,7 +221,8 @@ export async function withEventTracker(
     source,
     monitorAccount,
     mongodbUrl,
-    eventsSyncStep
+    eventsSyncStep,
+    eventSyncStartingPoint,
   );
 
   try {
