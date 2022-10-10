@@ -50,6 +50,9 @@ export class DelphinusContract {
   }
 
   async getPastEventsFromSteped(fromBlock: number, toBlock: number, step: number) {
+    if(fromBlock > toBlock) {
+      throw("Error: fromBlock > toBlock, fromblock:" + fromBlock + ", toBlock:" + toBlock);
+    }
     let pastEvents = [];
     let start = fromBlock;
     let end = 0;
