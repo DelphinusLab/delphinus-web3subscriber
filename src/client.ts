@@ -42,6 +42,34 @@ export class DelphinusContract {
     });
   }
 
+  async getPastEventsFromTo(fromBlock: number, toBlock: number) {
+    return await this.contract.getPastEvents("allEvents", {
+      fromBlock: fromBlock,
+      toBlock: toBlock
+    });
+  }
+
+  async getPastEventsFromSteped(fromBlock: number, toBlock: number, step: number) {
+    let pastEvents = [];
+    let start = fromBlock;
+    let end = 0;
+    if(step <= 0){
+      pastEvents.push(await this.getPastEventsFromTo(start, toBlock));
+      end = toBlock;
+      console.log("getEvents from", start, "to", end);
+    }else{
+      let count = 0;
+      while (end < toBlock && count < 10){
+        end = start+step-1 < toBlock ? start+step-1 : toBlock;
+        console.log("getEvents from", start, "to", end);
+        pastEvents.push(await this.getPastEventsFromTo(start, end));
+        start += step;
+        count ++;
+      }
+    }
+    return {"events": pastEvents, "breakpoint": end}
+  }
+
   address() {
     return this.contract.options.address;
   }

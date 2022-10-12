@@ -3,6 +3,7 @@ import { EventData } from "web3-eth-contract";
 import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
 import { DelphinusHttpProvider } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
+import Web3 from "web3";
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -45,6 +46,15 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
+  async updatelastCheckedBlockNumber(blockNumber:number){
+    let infoCollection = await this.getInfoCollection();
+    await infoCollection.updateOne(
+      { name: "LastUpdatedBlock" },
+      { $set: { lastblock: blockNumber } },
+      { upsert: true }
+    );
+  }
+
   // TODO: replace any with real type
   async updateLastMonitorBlock(r: EventData, v: any) {
     let client = await this.getClient();
@@ -76,6 +86,9 @@ export class EventTracker {
   private readonly address: string;
   private readonly dbUrl: string;
   private readonly dbName: string;
+  private readonly source: string;
+  private readonly eventsSyncStep: number;
+  private readonly eventSyncStartingPoint: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -85,7 +98,9 @@ export class EventTracker {
     dataJson: any,
     source: string,
     monitorAccount: string,
-    mongodbUrl: string
+    mongodbUrl: string,
+    eventsSyncStep: number,
+    eventSyncStartingPoint: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -99,29 +114,45 @@ export class EventTracker {
     this.contract = web3.getContract(dataJson, this.address, monitorAccount);
     this.dbUrl = mongodbUrl;
     this.dbName = networkId + this.address;
+    this.source = source;
+    this.eventSyncStartingPoint = eventSyncStartingPoint;
+    const defaultStep = 0;
+    if(eventsSyncStep == undefined || eventsSyncStep <= 0){
+      this.eventsSyncStep = defaultStep;
+    }else{
+      this.eventsSyncStep = eventsSyncStep;
+    }
   }
 
   private async syncPastEvents(
     handlers: (n: string, v: any, hash: string) => Promise<void>,
     db: EventDBHelper
   ) {
-    let lastblock = await db.getLastMonitorBlock();
-    console.log("sync from ", lastblock);
+    let lastCheckedBlockNumber = await db.getLastMonitorBlock();
+    let latestBlockNumber = await getLatestBlockNumber(this.source);
+    if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
+      lastCheckedBlockNumber = this.eventSyncStartingPoint;
+      console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
+    }
+    console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
-      let pastEvents = await this.contract.getPastEventsFrom(lastblock + 1);
-      console.log("sync from ", lastblock, "done");
-      for (let r of pastEvents) {
-        console.log(
-          "========================= Get L1 Event: %s ========================",
-          r.event
-        );
-        console.log("blockNumber:", r.blockNumber);
-        console.log("blockHash:", r.blockHash);
-        console.log("transactionHash:", r.transactionHash);
-        let e = buildEventValue(this.l1Events, r);
-        await handlers(r.event, e, r.transactionHash);
-        await db.updateLastMonitorBlock(r, e);
+      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
+      console.log("sync from ", lastCheckedBlockNumber + 1, "done");
+      for(let group of pastEvents.events){
+        for (let r of group) {
+          console.log(
+            "========================= Get L1 Event: %s ========================",
+            r.event
+          );
+          console.log("blockNumber:", r.blockNumber);
+          console.log("blockHash:", r.blockHash);
+          console.log("transactionHash:", r.transactionHash);
+          let e = buildEventValue(this.l1Events, r);
+          await handlers(r.event, e, r.transactionHash);
+          await db.updateLastMonitorBlock(r, e);
+        }
       }
+      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
     } catch (err) {
       console.log("%s", err);
       throw(err);
@@ -180,6 +211,8 @@ export async function withEventTracker(
   source: string,
   monitorAccount: string,
   mongodbUrl: string,
+  eventsSyncStep: number,
+  eventSyncStartingPoint: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -187,7 +220,9 @@ export async function withEventTracker(
     dataJson,
     source,
     monitorAccount,
-    mongodbUrl
+    mongodbUrl,
+    eventsSyncStep,
+    eventSyncStartingPoint,
   );
 
   try {
@@ -197,4 +232,27 @@ export async function withEventTracker(
   } finally {
     await eventTracker.close();
   }
+}
+
+function getWeb3FromSource(provider: string) {
+  const HttpProvider = "https";
+  if(provider.includes(HttpProvider)){
+    return new Web3(new Web3.providers.HttpProvider(provider));
+  }else {
+    return new Web3(new Web3.providers.WebsocketProvider(provider));
+  }
+}
+
+async function getLatestBlockNumber(provider: string) {
+  let latestBlockNumber: any
+  let web3 = getWeb3FromSource(provider);
+  await web3.eth.getBlockNumber(function(err, result) {  
+    if (err) {
+      console.log(err);
+      throw err;
+    } else {
+      latestBlockNumber = result;
+    }
+  });
+  return latestBlockNumber
 }
