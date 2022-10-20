@@ -152,7 +152,9 @@ export class EventTracker {
           await db.updateLastMonitorBlock(r, e);
         }
       }
-      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      if(pastEvents.breakpoint > lastCheckedBlockNumber) {
+        await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      }
     } catch (err) {
       console.log("%s", err);
       throw(err);
