@@ -65,9 +65,8 @@ export class DelphinusContract {
         if(count < 10){
           pastEvents.push(await this.getPastEventsFromTo(start, end));
         }else{
-          setTimeout(async() => {
-            pastEvents.push(await this.getPastEventsFromTo(start, end));
-          }, 5000);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          pastEvents.push(await this.getPastEventsFromTo(start, end));
           count = 0;
         }
         start += step;
