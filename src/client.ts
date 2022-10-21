@@ -59,15 +59,22 @@ export class DelphinusContract {
       console.log("getEvents from", start, "to", end);
     }else{
       let count = 0;
-      while (end < toBlock && count < 10){
+      while (end < toBlock){
         end = start+step-1 < toBlock ? start+step-1 : toBlock;
         console.log("getEvents from", start, "to", end);
-        pastEvents.push(await this.getPastEventsFromTo(start, end));
+        if(count < 10){
+          pastEvents.push(await this.getPastEventsFromTo(start, end));
+        }else{
+          setTimeout(async() => {
+            pastEvents.push(await this.getPastEventsFromTo(start, end));
+          }, 5000);
+          count = 0;
+        }
         start += step;
         count ++;
       }
     }
-    return {"events": pastEvents, "breakpoint": end}
+    return pastEvents
   }
 
   address() {

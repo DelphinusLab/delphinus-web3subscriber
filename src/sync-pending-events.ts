@@ -46,15 +46,6 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
-  async updatelastCheckedBlockNumber(blockNumber:number){
-    let infoCollection = await this.getInfoCollection();
-    await infoCollection.updateOne(
-      { name: "LastUpdatedBlock" },
-      { $set: { lastblock: blockNumber } },
-      { upsert: true }
-    );
-  }
-
   // TODO: replace any with real type
   async updateLastMonitorBlock(r: EventData, v: any) {
     let client = await this.getClient();
@@ -138,7 +129,7 @@ export class EventTracker {
     try {
       let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
       console.log("sync from ", lastCheckedBlockNumber + 1, "done");
-      for(let group of pastEvents.events){
+      for(let group of pastEvents){
         for (let r of group) {
           console.log(
             "========================= Get L1 Event: %s ========================",
@@ -151,9 +142,6 @@ export class EventTracker {
           await handlers(r.event, e, r.transactionHash);
           await db.updateLastMonitorBlock(r, e);
         }
-      }
-      if(pastEvents.breakpoint > lastCheckedBlockNumber) {
-        await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
       }
     } catch (err) {
       console.log("%s", err);
