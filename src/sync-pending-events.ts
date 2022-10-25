@@ -152,10 +152,8 @@ export class EventTracker {
           await db.updateLastMonitorBlock(r, e);
         }
       }
-      if (pastEvents.breakpoint > lastCheckedBlockNumber){
-        let breakpoint = await getValidBlockNumber(this.source, lastCheckedBlockNumber, pastEvents.breakpoint);
-        await db.updatelastCheckedBlockNumber(breakpoint);
-      }
+      let breakpoint = await getValidBlockNumber(this.source, lastCheckedBlockNumber, pastEvents.breakpoint);
+      await db.updatelastCheckedBlockNumber(breakpoint);
     } catch (err) {
       console.log("%s", err);
       throw(err);
@@ -261,15 +259,24 @@ async function getLatestBlockNumber(provider: string) {
 }
 
 async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+  if(endPoint < startPoint){
+    console.log('The Latest BlockNumber Get From RpcSource Has Issue, Smaller than Real Value');
+    return startPoint
+  }
   let web3 = getWeb3FromSource(provider);
   let chekced =  false;
+  let BlockNumberIssue = false;
   while(!chekced){
     await web3.eth.getBlock(`${endPoint}`).then(async block => {
       if (block == null) {
-        let [start, end] = await binarySearchValidBlock(provider, startPoint, endPoint);
-        startPoint = start;
-        endPoint = end;
+        let [lowerBoundary, upperBoundary] = await binarySearchValidBlock(provider, startPoint, endPoint);
+        startPoint = lowerBoundary;
+        endPoint = upperBoundary;
+        BlockNumberIssue = true;
       }else {
+        if (BlockNumberIssue){
+          console.log('The Latest BlockNumber Get From RpcSource Has Issue, Larger than Real Value');
+        }
         chekced = true;
       }
     })
