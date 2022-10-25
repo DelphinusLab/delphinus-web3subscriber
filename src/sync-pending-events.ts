@@ -152,7 +152,10 @@ export class EventTracker {
           await db.updateLastMonitorBlock(r, e);
         }
       }
-      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      if (pastEvents.breakpoint > lastCheckedBlockNumber){
+        let breakpoint = await getValidBlockNumber(this.source, lastCheckedBlockNumber, pastEvents.breakpoint);
+        await db.updatelastCheckedBlockNumber(breakpoint);
+      }
     } catch (err) {
       console.log("%s", err);
       throw(err);
@@ -255,4 +258,34 @@ async function getLatestBlockNumber(provider: string) {
     }
   });
   return latestBlockNumber
+}
+
+async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+  let web3 = getWeb3FromSource(provider);
+  let chekced =  false;
+  while(!chekced){
+    await web3.eth.getBlock(`${endPoint}`).then(async block => {
+      if (block == null) {
+        let [start, end] = await binarySearchValidBlock(provider, startPoint, endPoint);
+        startPoint = start;
+        endPoint = end;
+      }else {
+        chekced = true;
+      }
+    })
+  }
+  return endPoint
+}
+
+async function binarySearchValidBlock(provider: string, start: number, end: number){
+  let web3 = getWeb3FromSource(provider);
+  let mid = Math.floor((start + end)/2);
+  await web3.eth.getBlock(`${mid}`).then(midblock => {
+    if (midblock != null){
+      start = mid;
+    }else{
+      end = mid;
+    }
+  })
+  return [start, end]
 }
