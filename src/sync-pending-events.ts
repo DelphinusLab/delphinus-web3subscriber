@@ -267,7 +267,7 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
   }
   let web3 = getWeb3FromSource(provider);
   let chekced =  false;
-  let BlockNumberIssue = false;
+  let blockNumberIssue = false;
   let lastCheckedBlockNumber = startPoint;
   while(!chekced){
     await web3.eth.getBlock(`${endPoint}`).then(async block => {
@@ -275,9 +275,9 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
         let [lowerBoundary, upperBoundary] = await binarySearchValidBlock(provider, startPoint, endPoint);
         startPoint = lowerBoundary;
         endPoint = upperBoundary;
-        BlockNumberIssue = true;
+        blockNumberIssue = true;
       }else {
-        if (BlockNumberIssue){
+        if (blockNumberIssue){
           console.log(`ISSUE: Cannot find actual blocks from block number: ${endPoint + 1}, the actual lastCheckedBlockNumber is: ${endPoint}`);
         }
         chekced = true;
@@ -294,6 +294,9 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
 async function binarySearchValidBlock(provider: string, start: number, end: number){
   let web3 = getWeb3FromSource(provider);
   let mid = Math.floor((start + end)/2);
+  if (mid == start){
+    return [mid, mid]
+  }
   await web3.eth.getBlock(`${mid}`).then(midblock => {
     if (midblock != null){
       start = mid;
