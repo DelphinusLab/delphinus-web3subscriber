@@ -260,7 +260,7 @@ async function getLatestBlockNumber(provider: string) {
 
 async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
   if(endPoint < startPoint){
-    console.log('The Latest BlockNumber Get From RpcSource Has Issue, Smaller than Real Value');
+    console.log('ISSUE: LatestBlockNumber Get from RpcSource is smaller than real value, we will not change lastCheckedBlockNumber');
     return startPoint
   }
   let web3 = getWeb3FromSource(provider);
@@ -275,7 +275,7 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
         BlockNumberIssue = true;
       }else {
         if (BlockNumberIssue){
-          console.log('The Latest BlockNumber Get From RpcSource Has Issue, Larger than Real Value');
+          console.log('ISSUE: LatestBlockNumber Get from RpcSource is Larger than Real Value, the actual lastCheckedBlockNumber is: ' + endPoint);
         }
         chekced = true;
       }
