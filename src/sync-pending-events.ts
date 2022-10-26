@@ -153,7 +153,9 @@ export class EventTracker {
         }
       }
       let breakpoint = await getValidBlockNumber(this.source, lastCheckedBlockNumber, pastEvents.breakpoint);
-      await db.updatelastCheckedBlockNumber(breakpoint);
+      if (breakpoint) {
+        await db.updatelastCheckedBlockNumber(breakpoint);
+      }
     } catch (err) {
       console.log("%s", err);
       throw(err);
@@ -260,12 +262,13 @@ async function getLatestBlockNumber(provider: string) {
 
 async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
   if(endPoint < startPoint){
-    console.log('ISSUE: LatestBlockNumber Get from RpcSource is smaller than real value, we will not change lastCheckedBlockNumber');
-    return startPoint
+    console.log('ISSUE: LatestBlockNumber Get from RpcSource is smaller than lastCheckedBlockNumber, we will not modify lastCheckedBlockNumber');
+    return null
   }
   let web3 = getWeb3FromSource(provider);
   let chekced =  false;
   let BlockNumberIssue = false;
+  let lastCheckedBlockNumber = startPoint;
   while(!chekced){
     await web3.eth.getBlock(`${endPoint}`).then(async block => {
       if (block == null) {
@@ -275,11 +278,15 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
         BlockNumberIssue = true;
       }else {
         if (BlockNumberIssue){
-          console.log('ISSUE: LatestBlockNumber Get from RpcSource is Larger than Real Value, the actual lastCheckedBlockNumber is: ' + endPoint);
+          console.log(`ISSUE: Cannot find actual blocks from block number: ${endPoint + 1}, the actual lastCheckedBlockNumber is: ${endPoint}`);
         }
         chekced = true;
       }
     })
+  }
+  if (lastCheckedBlockNumber == endPoint){
+    console.log('ISSUE: Cannot find actual blocks from lastCheckedBlockNumber + 1, we will not modify lastCheckedBlockNumber');
+    return null
   }
   return endPoint
 }
