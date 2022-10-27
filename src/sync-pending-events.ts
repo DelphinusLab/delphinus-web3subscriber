@@ -130,6 +130,12 @@ export class EventTracker {
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
     let latestBlockNumber = await getLatestBlockNumber(this.source);
+    let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
+    if (trueLatestBlockNumber) {
+      latestBlockNumber = trueLatestBlockNumber;
+    }else {
+      latestBlockNumber = lastCheckedBlockNumber;
+    }
     if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
@@ -255,4 +261,46 @@ async function getLatestBlockNumber(provider: string) {
     }
   });
   return latestBlockNumber
+}
+
+async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+  if(endPoint < startPoint){
+    console.log('ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber');
+    return null
+  }
+  let web3 = getWeb3FromSource(provider);
+  let chekced =  false;
+  let blockNumberIssue = false;
+  while(!chekced){
+    await web3.eth.getBlock(`${endPoint}`).then(async block => {
+      if (block == null) {
+        let [lowerBoundary, upperBoundary] = await binarySearchValidBlock(provider, startPoint, endPoint);
+        startPoint = lowerBoundary;
+        endPoint = upperBoundary;
+        blockNumberIssue = true;
+      }else {
+        if (blockNumberIssue){
+          console.log(`ISSUE: Cannot find actual blocks from block number: ${endPoint + 1}, the actual latestBlockNumber is: ${endPoint}`);
+        }
+        chekced = true;
+      }
+    })
+  }
+  return endPoint
+}
+
+async function binarySearchValidBlock(provider: string, start: number, end: number){
+  let web3 = getWeb3FromSource(provider);
+  let mid = Math.floor((start + end)/2);
+  if (mid == start){
+    return [mid, mid]
+  }
+  await web3.eth.getBlock(`${mid}`).then(midblock => {
+    if (midblock != null){
+      start = mid;
+    }else{
+      end = mid;
+    }
+  })
+  return [start, end]
 }
