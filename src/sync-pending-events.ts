@@ -265,7 +265,7 @@ async function getLatestBlockNumber(provider: string) {
       latestBlockNumber = result;
     }
   });
-  return latestBlockNumber;
+  return latestBlockNumber
 }
 
 export async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
