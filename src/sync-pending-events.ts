@@ -243,13 +243,13 @@ export async function withEventTracker(
 export const getweb3 = {
   getWeb3FromSource: (provider: string) => {
     const HttpProvider = "https";
-    let web3: any
+    let web3: any;
     if(provider.includes(HttpProvider)){
       web3 = new Web3(new Web3.providers.HttpProvider(provider));
-      return web3
+      return web3;
     }else {
       web3 = new Web3(new Web3.providers.WebsocketProvider(provider));
-      return web3
+      return web3;
     }
   }
 }
@@ -265,7 +265,7 @@ async function getLatestBlockNumber(provider: string) {
       latestBlockNumber = result;
     }
   });
-  return latestBlockNumber
+  return latestBlockNumber;
 }
 
 export async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
