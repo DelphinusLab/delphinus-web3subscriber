@@ -303,7 +303,7 @@ export async function binarySearchValidBlock(provider: string, start: number, en
   await web3.eth.getBlock(`${mid}`).then(midblock => {
     if (midblock != null){
       start = mid;
-    }else{ 
+    }else{
       end = mid;
     }
   })
