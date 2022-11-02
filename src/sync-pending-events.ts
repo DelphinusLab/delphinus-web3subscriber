@@ -240,18 +240,23 @@ export async function withEventTracker(
   }
 }
 
-function getWeb3FromSource(provider: string) {
-  const HttpProvider = "https";
-  if(provider.includes(HttpProvider)){
-    return new Web3(new Web3.providers.HttpProvider(provider));
-  }else {
-    return new Web3(new Web3.providers.WebsocketProvider(provider));
+export const getweb3 = {
+  getWeb3FromSource: (provider: string) => {
+    const HttpProvider = "https";
+    let web3: any
+    if(provider.includes(HttpProvider)){
+      web3 = new Web3(new Web3.providers.HttpProvider(provider));
+      return web3
+    }else {
+      web3 = new Web3(new Web3.providers.WebsocketProvider(provider));
+      return web3
+    }
   }
 }
 
 async function getLatestBlockNumber(provider: string) {
   let latestBlockNumber: any
-  let web3 = getWeb3FromSource(provider);
+  let web3:Web3 = getweb3.getWeb3FromSource(provider);
   await web3.eth.getBlockNumber(function(err, result) {  
     if (err) {
       console.log(err);
@@ -263,12 +268,12 @@ async function getLatestBlockNumber(provider: string) {
   return latestBlockNumber
 }
 
-async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+export async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
   if(endPoint < startPoint){
     console.log('ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber');
     return null
   }
-  let web3 = getWeb3FromSource(provider);
+  let web3:Web3 = getweb3.getWeb3FromSource(provider);
   let chekced =  false;
   let blockNumberIssue = false;
   while(!chekced){
@@ -289,8 +294,8 @@ async function getValidBlockNumber(provider: string, startPoint: number, endPoin
   return endPoint
 }
 
-async function binarySearchValidBlock(provider: string, start: number, end: number){
-  let web3 = getWeb3FromSource(provider);
+export async function binarySearchValidBlock(provider: string, start: number, end: number){
+  let web3:Web3 = getweb3.getWeb3FromSource(provider);
   let mid = Math.floor((start + end)/2);
   if (mid == start){
     return [mid, mid]
@@ -298,7 +303,7 @@ async function binarySearchValidBlock(provider: string, start: number, end: numb
   await web3.eth.getBlock(`${mid}`).then(midblock => {
     if (midblock != null){
       start = mid;
-    }else{
+    }else{ 
       end = mid;
     }
   })
