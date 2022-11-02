@@ -7,14 +7,14 @@ addMock.mockReturnValue({eth: { getBlock: (index: string) => {return Promise.res
 describe("test functions in syncEvent works", () => {
     test("test binarySearchValidBlock function works case 1", async () => {
         jest.setTimeout(60000); //1 minute timeout
-        binarySearchValidBlock("MockProvider", 2, 15).then((result)=>{
+        await binarySearchValidBlock("MockProvider", 2, 15).then((result)=>{
             expect(result).toEqual([2, 8]);
         });
     });
 
     test("test binarySearchValidBlock function works case 2", async () => {
         jest.setTimeout(60000); //1 minute timeout
-        binarySearchValidBlock("MockProvider", 6, 100).then((result)=>{
+        await binarySearchValidBlock("MockProvider", 6, 100).then((result)=>{
             expect(result).toEqual([6, 53]);
         });
     });
