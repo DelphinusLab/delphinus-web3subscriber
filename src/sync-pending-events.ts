@@ -89,6 +89,7 @@ export class EventTracker {
   private readonly source: string;
   private readonly eventsSyncStep: number;
   private readonly eventSyncStartingPoint: number;
+  private readonly bufferBlocks: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -101,6 +102,7 @@ export class EventTracker {
     mongodbUrl: string,
     eventsSyncStep: number,
     eventSyncStartingPoint: number,
+    bufferBlocks: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -116,6 +118,7 @@ export class EventTracker {
     this.dbName = networkId + this.address;
     this.source = source;
     this.eventSyncStartingPoint = eventSyncStartingPoint;
+    this.bufferBlocks = bufferBlocks;
     const defaultStep = 0;
     if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
@@ -132,7 +135,7 @@ export class EventTracker {
     let latestBlockNumber = await getLatestBlockNumber(this.source);
     let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
     if (trueLatestBlockNumber) {
-      latestBlockNumber = trueLatestBlockNumber;
+      latestBlockNumber = trueLatestBlockNumber - this.bufferBlocks;
     }else {
       latestBlockNumber = lastCheckedBlockNumber;
     }
@@ -219,6 +222,7 @@ export async function withEventTracker(
   mongodbUrl: string,
   eventsSyncStep: number,
   eventSyncStartingPoint: number,
+  bufferBlocks: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -229,6 +233,7 @@ export async function withEventTracker(
     mongodbUrl,
     eventsSyncStep,
     eventSyncStartingPoint,
+    bufferBlocks,
   );
 
   try {
