@@ -132,13 +132,9 @@ export class EventTracker {
     db: EventDBHelper
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
-    let latestBlockNumber = await getLatestBlockNumber(this.source);
+    let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
     let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
-    if (trueLatestBlockNumber) {
-      latestBlockNumber = trueLatestBlockNumber - this.bufferBlocks;
-    }else {
-      latestBlockNumber = lastCheckedBlockNumber;
-    }
+    latestBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
@@ -259,7 +255,15 @@ export const getweb3 = {
   }
 }
 
-async function getLatestBlockNumber(provider: string) {
+export async function getReliableBlockNumber(trueLatestBlockNumber: any, lastCheckedBlockNumber: number, bufferBlocks: number) {
+  let latestBlockNumber = lastCheckedBlockNumber;
+  if (trueLatestBlockNumber) {
+    latestBlockNumber = trueLatestBlockNumber - bufferBlocks > 0? trueLatestBlockNumber - bufferBlocks : lastCheckedBlockNumber;
+  }
+  return latestBlockNumber
+}
+
+async function getLatestBlockNumberFromSource(provider: string) {
   let latestBlockNumber: any
   let web3:Web3 = getweb3.getWeb3FromSource(provider);
   await web3.eth.getBlockNumber(function(err, result) {  
