@@ -132,13 +132,13 @@ export class EventTracker {
     db: EventDBHelper
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
-    let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
-    let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
-    latestBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
     }
+    let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
+    let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
+    latestBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
       let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
