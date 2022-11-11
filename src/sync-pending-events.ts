@@ -138,10 +138,10 @@ export class EventTracker {
     }
     let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
     let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
-    latestBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
+    let reliableBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
-      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
+      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, reliableBlockNumber, this.eventsSyncStep);
       console.log("sync from ", lastCheckedBlockNumber + 1, "done");
       for(let group of pastEvents.events){
         for (let r of group) {
