@@ -140,28 +140,30 @@ export class EventTracker {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
     }
-    console.log("sync from ", lastCheckedBlockNumber + 1);
-    try {
-      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
-      console.log("sync from ", lastCheckedBlockNumber + 1, "done");
-      for(let group of pastEvents.events){
-        for (let r of group) {
-          console.log(
-            "========================= Get L1 Event: %s ========================",
-            r.event
-          );
-          console.log("blockNumber:", r.blockNumber);
-          console.log("blockHash:", r.blockHash);
-          console.log("transactionHash:", r.transactionHash);
-          let e = buildEventValue(this.l1Events, r);
-          await handlers(r.event, e, r.transactionHash);
-          await db.updateLastMonitorBlock(r, e);
+    if (lastCheckedBlockNumber + 1 < latestBlockNumber){
+      try {
+        console.log("sync from ", lastCheckedBlockNumber + 1);
+        let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
+        console.log("sync from ", lastCheckedBlockNumber + 1, "done");
+        for(let group of pastEvents.events){
+          for (let r of group) {
+            console.log(
+              "========================= Get L1 Event: %s ========================",
+              r.event
+            );
+            console.log("blockNumber:", r.blockNumber);
+            console.log("blockHash:", r.blockHash);
+            console.log("transactionHash:", r.transactionHash);
+            let e = buildEventValue(this.l1Events, r);
+            await handlers(r.event, e, r.transactionHash);
+            await db.updateLastMonitorBlock(r, e);
+          }
         }
+        await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      } catch (err) {
+        console.log("%s", err);
+        throw(err);
       }
-      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
-    } catch (err) {
-      console.log("%s", err);
-      throw(err);
     }
   }
 
