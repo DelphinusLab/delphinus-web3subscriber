@@ -137,7 +137,7 @@ export class EventTracker {
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
     }
     let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
-    let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
+    let trueLatestBlockNumber = await getTrueLatestBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
     let reliableBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
@@ -277,7 +277,7 @@ async function getLatestBlockNumberFromSource(provider: string) {
   return latestBlockNumber
 }
 
-export async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+export async function getTrueLatestBlockNumber(provider: string, startPoint: number, endPoint: number) {
   if(endPoint < startPoint){
     console.log('ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber');
     return null
