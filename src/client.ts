@@ -55,7 +55,7 @@ export class DelphinusContract {
     let end = 0;
     if(fromBlock > toBlock){
       console.log("No New Blocks Found From:"+ fromBlock);
-      return {"events": [], "breakpoint": fromBlock}
+      return {"events": [], "breakpoint": null}
     }
     if(step <= 0){
       pastEvents.push(await this.getPastEventsFromTo(start, toBlock));
