@@ -66,7 +66,10 @@ export class DelphinusContract {
       while (end < toBlock && count < 10){
         end = start+step-1 < toBlock ? start+step-1 : toBlock;
         console.log("getEvents from", start, "to", end);
-        pastEvents.push(await this.getPastEventsFromTo(start, end));
+        let group = await this.getPastEventsFromTo(start, end);
+        if (group.length != 0) {
+          pastEvents.push(group);
+        }
         start += step;
         count ++;
       }

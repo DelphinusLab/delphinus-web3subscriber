@@ -1,4 +1,81 @@
-import {getweb3, binarySearchValidBlock, getTrueLatestBlockNumber, getReliableBlockNumber} from "../src/sync-pending-events";
+import {getweb3, binarySearchValidBlock, getTrueLatestBlockNumber, EventDBHelper} from "../src/sync-pending-events";
+import { DelphinusContract } from "../src/client";
+import { EventData } from "web3-eth-contract";
+
+let mockEvents:EventData[] = [{
+    returnValues: {
+        value: 0
+    },
+    raw: {
+        data: "0",
+        topics: ["0"]
+    },
+    event: "0",
+    signature: "0",
+    logIndex: 0,
+    transactionIndex: 0,
+    transactionHash: "0",
+    blockHash: "0",
+    blockNumber: 0,
+    address: "0"
+},
+{
+    returnValues: {
+        value: 1
+    },
+    raw: {
+        data: "1",
+        topics: ["1"]
+    },
+    event: "1",
+    signature: "1",
+    logIndex: 1,
+    transactionIndex: 1,
+    transactionHash: "1",
+    blockHash: "1",
+    blockNumber: 1,
+    address: "1"
+}];
+
+jest.mock("../src/sync-pending-events", () => {
+    const original = jest.requireActual("../src/sync-pending-events");
+    let db:any = {"latestBlock":1};
+    return {
+        ...original,
+        EventDBHelper: jest.fn((fakeDB: any) => {
+            return {
+                getInfoCollection: () => { return db },
+                getLastMonitorBlock: () => { return db["latestBlock"]},
+                updateLastMonitorBlock: (r:any, e:any) => { db[r.event] = e },
+                updatelastCheckedBlockNumber: (index: number) => { db["latestBlock"] = index}
+            }
+        })
+    };
+});
+
+jest.mock("../src/dbhelper", () => {
+    return {
+        DBHelper: jest.fn((url: string, n: string)=>{
+            return{}
+        }),
+        withDBHelper: (db: any, uri: string, n: string, cb: () => {}) => {
+            return db;
+        }
+    };
+});
+
+const mockGetEvents = jest.spyOn(DelphinusContract.prototype, "getPastEventsFromTo");
+mockGetEvents.mockImplementation(
+    (start, end) => {
+        let result = [];
+        for (let i = start; i <= end; i++){
+            if(mockEvents[i]){
+                result.push(mockEvents[i])
+            }
+        }
+        return Promise.resolve(result)
+    }
+)
 
 let mockBlocks = ['1','1','1','1','1','1','1']; //Latest ValidBlockNumber should be 6
 const addMock = jest.spyOn(getweb3, "getWeb3FromSource");
@@ -19,49 +96,82 @@ describe("test functions in syncEvent works", () => {
         });
     });
 
-    test("test getTrueLatestBlockNumber function works case 1", async () => {
+    test("test getValidBlockNumber function works case 1", async () => {
         jest.setTimeout(60000); //1 minute timeout
         await getTrueLatestBlockNumber("MockProvider", 5, 100).then((result)=>{
             expect(result).toEqual(6);
         });
     });
 
-    test("test getTrueLatestBlockNumber function works case 2", async () => {
+    test("test getValidBlockNumber function works case 2", async () => {
         jest.setTimeout(60000); //1 minute timeout
         await getTrueLatestBlockNumber("MockProvider", 6, 100).then((result)=>{
             expect(result).toEqual(6);
         });
     });
 
-    test("test getTrueLatestBlockNumber function works case 3", async () => {
+    test("test getValidBlockNumber function works case 3", async () => {
         jest.setTimeout(60000); //1 minute timeout
         await getTrueLatestBlockNumber("MockProvider", 2, 6).then((result)=>{
             expect(result).toEqual(6);
         });
     });
 
-    test("test getReliableBlockNumber function works case 1", async () => {
+    test("test getPastEventsFromSteped function works case 1", async () => {
         jest.setTimeout(60000); //1 minute timeout
-        //trueLatestBlockNumber:30, lastCheckedBlockNumber:10, bufferBlocks:10
-        //reliableBlockNumber = trueLatestBlockNumber - bufferBlocks = 10
-        let reliableBlockNumber = await getReliableBlockNumber(30, 10, 10);
-        expect(reliableBlockNumber).toEqual(20);
+        await DelphinusContract.prototype.getPastEventsFromSteped(0,15,1).then((result:any)=>{
+            expect(result.breakpoint).toEqual(9);
+            expect(result.events).toEqual([[mockEvents[0]],[mockEvents[1]]]);
+        });
     });
 
-    test("test getReliableBlockNumber function works case 2", async () => {
+    test("test getPastEventsFromSteped function works case 2", async () => {
         jest.setTimeout(60000); //1 minute timeout
-        //trueLatestBlockNumber:10, lastCheckedBlockNumber:5, bufferBlocks:15
-        //trueLatestBlockNumber - bufferBlocks < 0
-        //reliableBlockNumber = lastCheckedBlockNumber 
-        let reliableBlockNumber = await getReliableBlockNumber(10, 5, 15);
-        expect(reliableBlockNumber).toEqual(5);
+        await DelphinusContract.prototype.getPastEventsFromSteped(1,15,1).then((result:any)=>{
+            expect(result.breakpoint).toEqual(10);
+            expect(result.events).toEqual([[mockEvents[1]]]);
+        });
     });
 
-    test("test getReliableBlockNumber function works case 3", async () => {
+    test("test getPastEventsFromSteped function works case 3", async () => {
         jest.setTimeout(60000); //1 minute timeout
-        //trueLatestBlockNumber:null, lastCheckedBlockNumber:10, bufferBlocks:15
-        //reliableBlockNumber = lastCheckedBlockNumber
-        let reliableBlockNumber = await getReliableBlockNumber(null, 10, 15);
-        expect(reliableBlockNumber).toEqual(10);
+        await DelphinusContract.prototype.getPastEventsFromSteped(0,15,2).then((result:any)=>{
+            expect(result.breakpoint).toEqual(15);
+            expect(result.events).toEqual([[mockEvents[0],mockEvents[1]]]);
+        });
     });
+
+    test("test getPastEventsFromSteped function works case 4", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        await DelphinusContract.prototype.getPastEventsFromSteped(0,15,-2).then((result:any)=>{
+            expect(result.breakpoint).toEqual(15);
+            expect(result.events).toEqual([[mockEvents[0],mockEvents[1]]]);
+        });
+    });
+
+    test("test getPastEventsFromSteped function works case 5", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        await DelphinusContract.prototype.getPastEventsFromSteped(0,25,2).then((result:any)=>{
+            expect(result.breakpoint).toEqual(19);
+            expect(result.events).toEqual([[mockEvents[0],mockEvents[1]]]);
+        });
+    });
+
+    test("test getPastEventsFromSteped function works case 6", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        await DelphinusContract.prototype.getPastEventsFromSteped(10,2,1).then((result:any)=>{
+            expect(result).toEqual({"events": [], "breakpoint": null});
+        });
+    });
+
+    test("unfinished syncPastEvents test", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        let db = new EventDBHelper("","");
+        await db.updateLastMonitorBlock(mockEvents[1], 3);
+        await db.updatelastCheckedBlockNumber(4);
+        let results = db.getInfoCollection();
+        expect(results).toEqual({"1": 3,"latestBlock": 4});
+        let lastCheckedBlockNumber = await db.getLastMonitorBlock();
+        expect(lastCheckedBlockNumber).toEqual(4);
+    })
 });
