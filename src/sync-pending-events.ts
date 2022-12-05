@@ -27,7 +27,7 @@ function buildEventValue(events: any, r: EventData) {
 }
 
 /* Mongo Db helper to track all the recorded events handled so far */
-export class EventDBHelper extends DBHelper {
+class EventDBHelper extends DBHelper {
   private infoCollection?: Collection<Document>;
 
   async getInfoCollection() {
