@@ -1,4 +1,4 @@
-import {getweb3, binarySearchValidBlock, getTrueLatestBlockNumber, EventDBHelper} from "../src/sync-pending-events";
+import {getweb3, binarySearchValidBlock, getTrueLatestBlockNumber} from "../src/sync-pending-events";
 import { DelphinusContract } from "../src/client";
 import { EventData } from "web3-eth-contract";
 
@@ -36,33 +36,6 @@ let mockEvents:EventData[] = [{
     blockNumber: 1,
     address: "1"
 }];
-
-jest.mock("../src/sync-pending-events", () => {
-    const original = jest.requireActual("../src/sync-pending-events");
-    let db:any = {"latestBlock":1};
-    return {
-        ...original,
-        EventDBHelper: jest.fn((fakeDB: any) => {
-            return {
-                getInfoCollection: () => { return db },
-                getLastMonitorBlock: () => { return db["latestBlock"]},
-                updateLastMonitorBlock: (r:any, e:any) => { db[r.event] = e },
-                updatelastCheckedBlockNumber: (index: number) => { db["latestBlock"] = index}
-            }
-        })
-    };
-});
-
-jest.mock("../src/dbhelper", () => {
-    return {
-        DBHelper: jest.fn((url: string, n: string)=>{
-            return{}
-        }),
-        withDBHelper: (db: any, uri: string, n: string, cb: () => {}) => {
-            return db;
-        }
-    };
-});
 
 const mockGetEvents = jest.spyOn(DelphinusContract.prototype, "getPastEventsFromTo");
 mockGetEvents.mockImplementation(
@@ -163,15 +136,4 @@ describe("test functions in syncEvent works", () => {
             expect(result).toEqual({"events": [], "breakpoint": null});
         });
     });
-
-    test("unfinished syncPastEvents test", async () => {
-        jest.setTimeout(60000); //1 minute timeout
-        let db = new EventDBHelper("","");
-        await db.updateLastMonitorBlock(mockEvents[1], 3);
-        await db.updatelastCheckedBlockNumber(4);
-        let results = db.getInfoCollection();
-        expect(results).toEqual({"1": 3,"latestBlock": 4});
-        let lastCheckedBlockNumber = await db.getLastMonitorBlock();
-        expect(lastCheckedBlockNumber).toEqual(4);
-    })
 });
