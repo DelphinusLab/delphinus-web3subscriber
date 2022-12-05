@@ -136,4 +136,20 @@ describe("test functions in syncEvent works", () => {
             expect(result).toEqual({"events": [], "breakpoint": null});
         });
     });
+
+    test("test getPastEventsFromSteped function works case 7", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        await DelphinusContract.prototype.getPastEventsFromSteped(4,4,1).then((result:any)=>{
+            expect(result.breakpoint).toEqual(4);
+            expect(result.events).toEqual([]);
+        });
+    });
+
+    test("test getPastEventsFromSteped function works case 8", async () => {
+        jest.setTimeout(60000); //1 minute timeout
+        await DelphinusContract.prototype.getPastEventsFromSteped(1,1,1).then((result:any)=>{
+            expect(result.breakpoint).toEqual(1);
+            expect(result.events).toEqual([[mockEvents[1]]]);
+        });
+    });
 });
