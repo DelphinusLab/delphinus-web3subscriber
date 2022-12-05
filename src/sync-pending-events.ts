@@ -89,6 +89,7 @@ export class EventTracker {
   private readonly source: string;
   private readonly eventsSyncStep: number;
   private readonly eventSyncStartingPoint: number;
+  private readonly bufferBlocks: number;
 
   // TODO: replace any with real type
   private readonly l1Events: any;
@@ -101,6 +102,7 @@ export class EventTracker {
     mongodbUrl: string,
     eventsSyncStep: number,
     eventSyncStartingPoint: number,
+    bufferBlocks: number,
   ) {
     let providerConfig = {
       provider: new DelphinusHttpProvider(source),
@@ -116,6 +118,7 @@ export class EventTracker {
     this.dbName = networkId + this.address;
     this.source = source;
     this.eventSyncStartingPoint = eventSyncStartingPoint;
+    this.bufferBlocks = bufferBlocks;
     const defaultStep = 0;
     if(eventsSyncStep == undefined || eventsSyncStep <= 0){
       this.eventsSyncStep = defaultStep;
@@ -129,20 +132,16 @@ export class EventTracker {
     db: EventDBHelper
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
-    let latestBlockNumber = await getLatestBlockNumber(this.source);
-    let trueLatestBlockNumber = await getValidBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
-    if (trueLatestBlockNumber) {
-      latestBlockNumber = trueLatestBlockNumber;
-    }else {
-      latestBlockNumber = lastCheckedBlockNumber;
-    }
     if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
       console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
     }
+    let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
+    let trueLatestBlockNumber = await getTrueLatestBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
+    let reliableBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
-      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, latestBlockNumber, this.eventsSyncStep);
+      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, reliableBlockNumber, this.eventsSyncStep);
       console.log("sync from ", lastCheckedBlockNumber + 1, "done");
       for(let group of pastEvents.events){
         for (let r of group) {
@@ -158,7 +157,9 @@ export class EventTracker {
           await db.updateLastMonitorBlock(r, e);
         }
       }
-      await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      if(pastEvents.breakpoint){
+        await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
+      }
     } catch (err) {
       console.log("%s", err);
       throw(err);
@@ -219,6 +220,7 @@ export async function withEventTracker(
   mongodbUrl: string,
   eventsSyncStep: number,
   eventSyncStartingPoint: number,
+  bufferBlocks: number,
   cb: (eventTracker: EventTracker) => Promise<void>
 ) {
   let eventTracker = new EventTracker(
@@ -229,6 +231,7 @@ export async function withEventTracker(
     mongodbUrl,
     eventsSyncStep,
     eventSyncStartingPoint,
+    bufferBlocks,
   );
 
   try {
@@ -254,7 +257,15 @@ export const getweb3 = {
   }
 }
 
-async function getLatestBlockNumber(provider: string) {
+export async function getReliableBlockNumber(trueLatestBlockNumber: any, lastCheckedBlockNumber: number, bufferBlocks: number) {
+  let latestBlockNumber = lastCheckedBlockNumber;
+  if (trueLatestBlockNumber) {
+    latestBlockNumber = trueLatestBlockNumber - bufferBlocks > 0? trueLatestBlockNumber - bufferBlocks : lastCheckedBlockNumber;
+  }
+  return latestBlockNumber
+}
+
+async function getLatestBlockNumberFromSource(provider: string) {
   let latestBlockNumber: any
   let web3:Web3 = getweb3.getWeb3FromSource(provider);
   await web3.eth.getBlockNumber(function(err, result) {  
@@ -268,7 +279,7 @@ async function getLatestBlockNumber(provider: string) {
   return latestBlockNumber
 }
 
-export async function getValidBlockNumber(provider: string, startPoint: number, endPoint: number) {
+export async function getTrueLatestBlockNumber(provider: string, startPoint: number, endPoint: number) {
   if(endPoint < startPoint){
     console.log('ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber');
     return null

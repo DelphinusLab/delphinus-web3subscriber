@@ -53,6 +53,10 @@ export class DelphinusContract {
     let pastEvents = [];
     let start = fromBlock;
     let end = 0;
+    if(fromBlock > toBlock){
+      console.log("No New Blocks Found From:"+ fromBlock);
+      return {"events": [], "breakpoint": null}
+    }
     if(step <= 0){
       pastEvents.push(await this.getPastEventsFromTo(start, toBlock));
       end = toBlock;
@@ -62,7 +66,10 @@ export class DelphinusContract {
       while (end < toBlock && count < 10){
         end = start+step-1 < toBlock ? start+step-1 : toBlock;
         console.log("getEvents from", start, "to", end);
-        pastEvents.push(await this.getPastEventsFromTo(start, end));
+        let group = await this.getPastEventsFromTo(start, end);
+        if (group.length != 0) {
+          pastEvents.push(group);
+        }
         start += step;
         count ++;
       }
