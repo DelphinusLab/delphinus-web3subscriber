@@ -45,36 +45,40 @@ export class DelphinusContract {
   async getPastEventsFromTo(fromBlock: number, toBlock: number) {
     return await this.contract.getPastEvents("allEvents", {
       fromBlock: fromBlock,
-      toBlock: toBlock
+      toBlock: toBlock,
     });
   }
 
-  async getPastEventsFromSteped(fromBlock: number, toBlock: number, step: number) {
+  async getPastEventsFromSteped(
+    fromBlock: number,
+    toBlock: number,
+    step: number
+  ) {
     let pastEvents = [];
     let start = fromBlock;
     let end = 0;
-    if(fromBlock > toBlock){
-      console.log("No New Blocks Found From:"+ fromBlock);
-      return {"events": [], "breakpoint": null}
+    if (fromBlock > toBlock) {
+      console.log("No New Blocks Found From:" + fromBlock);
+      return { events: [], breakpoint: null };
     }
-    if(step <= 0){
+    if (step <= 0) {
       pastEvents.push(await this.getPastEventsFromTo(start, toBlock));
       end = toBlock;
       console.log("getEvents from", start, "to", end);
-    }else{
+    } else {
       let count = 0;
-      while (end < toBlock && count < 10){
-        end = start+step-1 < toBlock ? start+step-1 : toBlock;
+      while (end < toBlock && count < 10) {
+        end = start + step - 1 < toBlock ? start + step - 1 : toBlock;
         console.log("getEvents from", start, "to", end);
         let group = await this.getPastEventsFromTo(start, end);
         if (group.length != 0) {
           pastEvents.push(group);
         }
         start += step;
-        count ++;
+        count++;
       }
     }
-    return {"events": pastEvents, "breakpoint": end}
+    return { events: pastEvents, breakpoint: end };
   }
 
   address() {
@@ -98,7 +102,13 @@ export abstract class DelphinusWeb3 {
   abstract switchNet(
     chainHexId: string,
     chainName: string,
-    rpcSource: string
+    rpcSource: string,
+    nativeCurrency?: {
+      name: string;
+      symbol: string;
+      decimals: number;
+    },
+    blockExplorer?: string
   ): Promise<void>;
 
   async getNetworkId() {
@@ -176,7 +186,17 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
     });
   }
 
-  async switchNet(chainHexId: string, chainName: string, rpcSource: string) {
+  async switchNet(
+    chainHexId: string,
+    chainName: string,
+    rpcSource: string,
+    nativeCurrency?: {
+      name: string;
+      symbol: string;
+      decimals: number;
+    },
+    blockExplorer?: string
+  ) {
     let id = await this.getNetworkId();
     let idHex = "0x" + new BN(id).toString(16);
     console.log("switch chain", idHex, chainHexId);
@@ -196,6 +216,8 @@ export class Web3BrowsersMode extends DelphinusWeb3 {
                   chainId: chainHexId,
                   chainName: chainName,
                   rpcUrls: [rpcSource],
+                  nativeCurrency: nativeCurrency,
+                  blockExplorerUrls: blockExplorer ? [blockExplorer] : null,
                 },
               ],
             });
