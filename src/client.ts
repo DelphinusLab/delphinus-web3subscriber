@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { Contract } from "web3-eth-contract";
+import { Contract, EventData } from "web3-eth-contract";
 import { provider } from "web3-core";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { MetaMaskInpageProvider } from "@metamask/providers";
@@ -10,6 +10,7 @@ import { DelphinusProvider } from "./provider";
 export class DelphinusContract {
   private readonly contract: Contract;
   private readonly jsonInterface: any;
+  public static contractAPITimeOut: number = 10000; //10 seconds
 
   constructor(
     web3Instance: DelphinusWeb3,
@@ -36,10 +37,41 @@ export class DelphinusContract {
     return this.jsonInterface;
   }
 
+  promiseWithTimeout<T>(
+    promise: Promise<T>,
+    ms: number,
+    timeoutError:string
+  ){
+    var timeoutHandler: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandler = setTimeout(() => {
+        reject(new Error(timeoutError));
+      }, ms);
+    });
+  
+    // returns a race between timeout and the passed promise
+    return Promise.race<T>([promise, timeoutPromise])
+    .then(
+      (value) => {
+        clearTimeout(timeoutHandler);
+        return value;
+      }
+    )
+  }
+
   async getPastEventsFrom(fromBlock: number) {
-    return await this.contract.getPastEvents("allEvents", {
+    const getPastEventsPromise = this.contract.getPastEvents("allEvents", {
       fromBlock: fromBlock,
     });
+    
+    try{
+      return await this.promiseWithTimeout(getPastEventsPromise, DelphinusContract.contractAPITimeOut, `getPastEvents time out after ${DelphinusContract.contractAPITimeOut} milliseconds`);
+    }
+    catch(e)
+    {
+      console.log("Exit Process: ", e);
+      process.exit(1);
+    }
   }
 
   async getPastEventsFromTo(fromBlock: number, toBlock: number) {
