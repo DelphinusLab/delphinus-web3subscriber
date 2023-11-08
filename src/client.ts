@@ -220,7 +220,7 @@ export class DelphinusBrowserProvider extends DelphinusProvider<BrowserProvider>
 }
 
 export async function withBrowserProvider<T>(
-  cb: (web3: DelphinusProvider<BrowserProvider>) => Promise<T>
+  cb: (web3: DelphinusBrowserProvider) => Promise<T>
 ) {
   let provider = new DelphinusBrowserProvider();
 
