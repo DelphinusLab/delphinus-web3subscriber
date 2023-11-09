@@ -237,8 +237,8 @@ export async function withBrowserProvider<T>(
   await provider.connect();
   try {
     return await cb(provider);
-  } finally {
-    await provider.close();
+  } catch (e) {
+    throw e;
   }
 }
 // For read-only purposes without private key, we can use a provider to read the blockchain state
