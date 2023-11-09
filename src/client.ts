@@ -170,6 +170,16 @@ export class DelphinusBrowserProvider extends DelphinusProvider<BrowserProvider>
     let signer = await this.provider.getSigner();
     return signer;
   }
+  async getContractWithSigner(
+    contractAddress: string,
+    abi: InterfaceAbi
+  ): Promise<DelphinusContract> {
+    return new DelphinusContract(
+      contractAddress,
+      abi,
+      await this.getJsonRpcSigner()
+    );
+  }
 
   async switchNet(chainInfo: ChainInfo) {
     let { chainHexId, chainName, nativeCurrency, rpcUrls, blockExplorerUrls } =
