@@ -1,9 +1,9 @@
 import { Collection, Document } from "mongodb";
-import { EventData } from "web3-eth-contract";
-import { DelphinusContract, DelphinusWeb3, Web3ProviderMode } from "./client";
-import { DelphinusHttpProvider } from "./provider";
+import { DelphinusContract } from "./client";
+import { DelphinusReadOnlyConnector } from "./provider";
 import { DBHelper, withDBHelper } from "./dbhelper";
-import Web3 from "web3";
+import { EventLog, Log } from "ethers";
+import { GetBaseProvider } from "./provider";
 
 // TODO: replace any with real type
 function getAbiEvents(abiJson: any) {
@@ -17,12 +17,12 @@ function getAbiEvents(abiJson: any) {
 }
 
 // TODO: replace any with real type
-function buildEventValue(events: any, r: EventData) {
-  let event = events[r.event];
+function buildEventValue(events: any, r: EventLog | Log) {
+  // let event = events[r];
   let v: any = {};
-  event.inputs.forEach((i: any) => {
-    v[i.name] = r.returnValues[i.name];
-  });
+  // event.inputs.forEach((i: any) => {
+  //   v[i.name] = r.returnValues[i.name];
+  // });
   return v;
 }
 
@@ -46,7 +46,7 @@ class EventDBHelper extends DBHelper {
     return rs === null ? 0 : rs.lastblock;
   }
 
-  async updatelastCheckedBlockNumber(blockNumber:number){
+  async updatelastCheckedBlockNumber(blockNumber: number) {
     let infoCollection = await this.getInfoCollection();
     await infoCollection.updateOne(
       { name: "LastUpdatedBlock" },
@@ -56,9 +56,9 @@ class EventDBHelper extends DBHelper {
   }
 
   // TODO: replace any with real type
-  async updateLastMonitorBlock(r: EventData, v: any) {
+  async updateLastMonitorBlock(r: EventLog, v: any) {
     let client = await this.getClient();
-    let eventCollection = await this.getOrCreateEventCollection(r.event);
+    let eventCollection = await this.getOrCreateEventCollection(r.eventName);
     let infoCollection = await this.getInfoCollection();
 
     await client.withSession(async (session) => {
@@ -81,12 +81,12 @@ class EventDBHelper extends DBHelper {
 }
 
 export class EventTracker {
-  private readonly web3: DelphinusWeb3;
+  private readonly provider: DelphinusReadOnlyConnector;
   private readonly contract: DelphinusContract;
-  private readonly address: string;
+  private readonly contractAddress: string;
   private readonly dbUrl: string;
   private readonly dbName: string;
-  private readonly source: string;
+  private readonly providerUrl: string;
   private readonly eventsSyncStep: number;
   private readonly eventSyncStartingPoint: number;
   private readonly bufferBlocks: number;
@@ -97,32 +97,29 @@ export class EventTracker {
   constructor(
     networkId: string,
     dataJson: any,
-    source: string,
+    providerUrl: string,
     monitorAccount: string,
     mongodbUrl: string,
     eventsSyncStep: number,
     eventSyncStartingPoint: number,
-    bufferBlocks: number,
+    bufferBlocks: number
   ) {
-    let providerConfig = {
-      provider: new DelphinusHttpProvider(source),
-      monitorAccount: monitorAccount,
-    };
-    let web3 = new Web3ProviderMode(providerConfig);
-
-    this.web3 = web3;
+    this.provider = new DelphinusReadOnlyConnector(providerUrl);
     this.l1Events = getAbiEvents(dataJson.abi);
-    this.address = dataJson.networks[networkId].address;
-    this.contract = web3.getContract(dataJson, this.address, monitorAccount);
+    this.contractAddress = dataJson.networks[networkId].address;
+    this.contract = this.provider.getContractWithoutSigner(
+      this.contractAddress,
+      dataJson.abi
+    );
     this.dbUrl = mongodbUrl;
-    this.dbName = networkId + this.address;
-    this.source = source;
+    this.dbName = networkId + this.contractAddress;
+    this.providerUrl = providerUrl;
     this.eventSyncStartingPoint = eventSyncStartingPoint;
     this.bufferBlocks = bufferBlocks;
     const defaultStep = 0;
-    if(eventsSyncStep == undefined || eventsSyncStep <= 0){
+    if (eventsSyncStep == undefined || eventsSyncStep <= 0) {
       this.eventsSyncStep = defaultStep;
-    }else{
+    } else {
       this.eventsSyncStep = eventsSyncStep;
     }
   }
@@ -132,37 +129,54 @@ export class EventTracker {
     db: EventDBHelper
   ) {
     let lastCheckedBlockNumber = await db.getLastMonitorBlock();
-    if(lastCheckedBlockNumber < this.eventSyncStartingPoint) {
+    if (lastCheckedBlockNumber < this.eventSyncStartingPoint) {
       lastCheckedBlockNumber = this.eventSyncStartingPoint;
-      console.log("Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used");
+      console.log(
+        "Chain Height Before Deployment: " + lastCheckedBlockNumber + " Is Used"
+      );
     }
-    let latestBlockNumber = await getLatestBlockNumberFromSource(this.source);
-    let trueLatestBlockNumber = await getTrueLatestBlockNumber(this.source, lastCheckedBlockNumber, latestBlockNumber);
-    let reliableBlockNumber = await getReliableBlockNumber(trueLatestBlockNumber, lastCheckedBlockNumber, this.bufferBlocks);
+    let latestBlockNumber = await getLatestBlockNumberFromSource(
+      this.providerUrl
+    );
+    let trueLatestBlockNumber = await getTrueLatestBlockNumber(
+      this.providerUrl,
+      lastCheckedBlockNumber,
+      latestBlockNumber
+    );
+    let reliableBlockNumber = await getReliableBlockNumber(
+      trueLatestBlockNumber,
+      lastCheckedBlockNumber,
+      this.bufferBlocks
+    );
     console.log("sync from ", lastCheckedBlockNumber + 1);
     try {
-      let pastEvents = await this.contract.getPastEventsFromSteped(lastCheckedBlockNumber + 1, reliableBlockNumber, this.eventsSyncStep);
+      let pastEvents = await this.contract.getPastEventsFromSteped(
+        lastCheckedBlockNumber + 1,
+        reliableBlockNumber,
+        this.eventsSyncStep
+      );
       console.log("sync from ", lastCheckedBlockNumber + 1, "done");
-      for(let group of pastEvents.events){
+      for (let group of pastEvents.events) {
         for (let r of group) {
           console.log(
             "========================= Get L1 Event: %s ========================",
-            r.event
+            r
           );
           console.log("blockNumber:", r.blockNumber);
           console.log("blockHash:", r.blockHash);
           console.log("transactionHash:", r.transactionHash);
           let e = buildEventValue(this.l1Events, r);
-          await handlers(r.event, e, r.transactionHash);
-          await db.updateLastMonitorBlock(r, e);
+          // TODO: check what handlers is supposed to do
+          await handlers(r.topics[0], e, r.transactionHash);
+          await db.updateLastMonitorBlock(r as EventLog, e);
         }
       }
-      if(pastEvents.breakpoint){
+      if (pastEvents.breakpoint) {
         await db.updatelastCheckedBlockNumber(pastEvents.breakpoint);
       }
     } catch (err) {
       console.log("%s", err);
-      throw(err);
+      throw err;
     }
   }
 
@@ -181,12 +195,15 @@ export class EventTracker {
 
   // For debug
   async subscribePendingEvents() {
-    //var subscription = this.web3.eth.subscribe('pendingTransactions',
-    this.web3
-      .web3Instance!.eth.subscribe("logs", { address: this.address })
-      .on("data", (transaction: any) => {
-        console.log(transaction);
-      });
+    // TODO: Check what the function is supposed to track
+
+    let contract = this.provider.getContractWithoutSigner(
+      this.contractAddress,
+      this.l1Events
+    );
+    contract.subscribeEvent("*", (event: any) => {
+      console.log(event);
+    });
   }
 
   private async resetEventsInfo(db: EventDBHelper) {
@@ -205,10 +222,6 @@ export class EventTracker {
         await this.resetEventsInfo(dbhelper);
       }
     );
-  }
-
-  async close() {
-    await this.web3.close();
   }
 }
 
@@ -231,92 +244,98 @@ export async function withEventTracker(
     mongodbUrl,
     eventsSyncStep,
     eventSyncStartingPoint,
-    bufferBlocks,
+    bufferBlocks
   );
 
   try {
     await cb(eventTracker);
-  } catch(e) {
-    throw(e);
+  } catch (e) {
+    throw e;
   } finally {
-    await eventTracker.close();
+    //await eventTracker.close();
   }
 }
 
-export const getweb3 = {
-  getWeb3FromSource: (provider: string) => {
-    const HttpProvider = "https";
-    let web3: any;
-    if(provider.includes(HttpProvider)){
-      web3 = new Web3(new Web3.providers.HttpProvider(provider));
-      return web3;
-    }else {
-      web3 = new Web3(new Web3.providers.WebsocketProvider(provider));
-      return web3;
-    }
-  }
-}
-
-export async function getReliableBlockNumber(trueLatestBlockNumber: any, lastCheckedBlockNumber: number, bufferBlocks: number) {
+export async function getReliableBlockNumber(
+  trueLatestBlockNumber: any,
+  lastCheckedBlockNumber: number,
+  bufferBlocks: number
+) {
   let latestBlockNumber = lastCheckedBlockNumber;
   if (trueLatestBlockNumber) {
-    latestBlockNumber = trueLatestBlockNumber - bufferBlocks > 0? trueLatestBlockNumber - bufferBlocks : lastCheckedBlockNumber;
+    latestBlockNumber =
+      trueLatestBlockNumber - bufferBlocks > 0
+        ? trueLatestBlockNumber - bufferBlocks
+        : lastCheckedBlockNumber;
   }
-  return latestBlockNumber
+  return latestBlockNumber;
 }
 
-async function getLatestBlockNumberFromSource(provider: string) {
-  let latestBlockNumber: any
-  let web3:Web3 = getweb3.getWeb3FromSource(provider);
-  await web3.eth.getBlockNumber(function(err, result) {  
-    if (err) {
-      console.log(err);
-      throw err;
-    } else {
-      latestBlockNumber = result;
-    }
-  });
-  return latestBlockNumber
+async function getLatestBlockNumberFromSource(providerUrl: string) {
+  let provider = GetBaseProvider(providerUrl);
+  try {
+    return await provider.getBlockNumber();
+  } catch (e) {
+    throw e;
+  }
 }
 
-export async function getTrueLatestBlockNumber(provider: string, startPoint: number, endPoint: number) {
-  if(endPoint < startPoint){
-    console.log('ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber');
-    return null
+export async function getTrueLatestBlockNumber(
+  providerUrl: string,
+  startPoint: number,
+  endPoint: number
+) {
+  if (endPoint < startPoint) {
+    console.log(
+      "ISSUE: LatestBlockNumber get from RpcSource is smaller than lastCheckedBlockNumber"
+    );
+    return null;
   }
-  let web3:Web3 = getweb3.getWeb3FromSource(provider);
-  let chekced =  false;
+  let provider = GetBaseProvider(providerUrl);
+  let chekced = false;
   let blockNumberIssue = false;
-  while(!chekced){
-    await web3.eth.getBlock(`${endPoint}`).then(async block => {
+  while (!chekced) {
+    await provider.getBlock(`${endPoint}`).then(async (block) => {
       if (block == null) {
-        let [lowerBoundary, upperBoundary] = await binarySearchValidBlock(provider, startPoint, endPoint);
+        let [lowerBoundary, upperBoundary] = await binarySearchValidBlock(
+          providerUrl,
+          startPoint,
+          endPoint
+        );
         startPoint = lowerBoundary;
         endPoint = upperBoundary;
         blockNumberIssue = true;
-      }else {
-        if (blockNumberIssue){
-          console.log(`ISSUE: Cannot find actual blocks from block number: ${endPoint + 1}, the actual latestBlockNumber is: ${endPoint}`);
+      } else {
+        if (blockNumberIssue) {
+          console.log(
+            `ISSUE: Cannot find actual blocks from block number: ${
+              endPoint + 1
+            }, the actual latestBlockNumber is: ${endPoint}`
+          );
         }
         chekced = true;
       }
-    })
+    });
   }
-  return endPoint
+  return endPoint;
 }
 
-export async function binarySearchValidBlock(provider: string, start: number, end: number){
-  let web3:Web3 = getweb3.getWeb3FromSource(provider);
-  let mid = Math.floor((start + end)/2);
-  if (mid == start){
-    return [mid, mid]
+export async function binarySearchValidBlock(
+  providerUrl: string,
+  start: number,
+  end: number
+) {
+  let provider = GetBaseProvider(providerUrl);
+  let mid = Math.floor((start + end) / 2);
+  if (mid == start) {
+    return [mid, mid];
   }
-  await web3.eth.getBlock(`${mid}`).then(midblock => {
-    if (midblock != null){
+  await provider.getBlock(`${mid}`).then((midblock) => {
+    if (midblock != null) {
       start = mid;
-    }else{
+    } else {
       end = mid;
     }
-  })
-  return [start, end]
+  });
+  return [start, end];
 }
