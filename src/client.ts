@@ -2,7 +2,6 @@ import { Contract, Signer, Provider, InterfaceAbi } from "ethers";
 import {
   DelphinusBaseProvider,
   DelphinusBrowserConnector,
-  DelphinusProvider,
   DelphinusReadOnlyConnector,
   DelphinusWalletConnector,
 } from "./provider.js";
