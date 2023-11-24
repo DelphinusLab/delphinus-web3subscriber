@@ -70,42 +70,24 @@ export class TxBinder {
     }
   ) {
     // If override tx method is provided, try to execute that instead
-    if (txMethod) {
-      try {
-        const txResponse = await txMethod();
-        // If the transactionHash event has been registered, call the associated callback
-        this.actions.bindings[name]?.transactionHash?.(txResponse);
+    try {
+      let transaction = txMethod
+        ? txMethod
+        : this.actions.transactionMethods[name];
+      const txResponse = await transaction();
+      // If the transactionHash event has been registered, call the associated callback
+      this.actions.bindings[name]?.transactionHash?.(txResponse);
 
-        // Wait for the transaction to be confirmed
-        const receipt = await txResponse.wait(
-          options?.confirmations,
-          options?.timeout
-        );
-        // If the confirmation event has been registered, call the associated callback
-        this.actions.bindings[name]?.transactionReceipt?.(receipt);
-      } catch (error) {
-        // If an error occurs, call the error callback
-        this.actions.bindings[name]?.error?.(error);
-      }
-    } else {
-      // Default method provided to the bind() method
-      try {
-        // If the transaction method has been registered, try to execute it
-        const txResponse = await this.actions.transactionMethods[name]();
-        // If the transactionHash event has been registered, call the associated callback
-        this.actions.bindings[name]?.transactionHash?.(txResponse);
-
-        // Wait for the transaction to be confirmed
-        const receipt = await txResponse.wait(
-          options?.confirmations,
-          options?.timeout
-        );
-        // If the confirmation event has been registered, call the associated callback
-        this.actions.bindings[name]?.transactionReceipt?.(receipt);
-      } catch (error) {
-        // If an error occurs, call the error callback
-        this.actions.bindings[name]?.error?.(error);
-      }
+      // Wait for the transaction to be confirmed
+      const receipt = await txResponse.wait(
+        options?.confirmations,
+        options?.timeout
+      );
+      // If the confirmation event has been registered, call the associated callback
+      this.actions.bindings[name]?.transactionReceipt?.(receipt);
+    } catch (error) {
+      // If an error occurs, call the error callback
+      this.actions.bindings[name]?.error?.(error);
     }
   }
 
@@ -180,40 +162,41 @@ async function ExampleBinder() {
   const binder = new TxBinder();
   // Example of how to use the when method
 
-  // Bind some callbacks to the approve action
-  binder.when("Approve", "transactionHash", (txResponse) => {
-    console.log("transactionHash", txResponse);
+  // Bind the transaction method to an action name
+  binder.bind("Approve", () => {
+    return contract.approve("0x1", 1);
   });
 
-  binder.when("Approve", "transactionReceipt", (receipt) => {
-    console.log("transactionReceipt", receipt);
-  });
-
-  binder.when("Approve", "error", (error) => {
-    console.log("error", error);
-  });
+  // Bind some callbacks to the approve action using the when method
+  binder
+    .when("Approve", "transactionHash", (txResponse) => {
+      console.log("transactionHash", txResponse);
+    })
+    .when("Approve", "transactionReceipt", (receipt) => {
+      console.log("transactionReceipt", receipt);
+    })
+    .when("Approve", "error", (error) => {
+      console.log("error", error);
+    });
 
   // Bind some callbacks to the deposit action
-  binder.when("Deposit", "transactionHash", async (txResponse) => {
-    console.log("transactionHash", txResponse);
-  });
+  binder
+    .when("Deposit", "transactionHash", async (txResponse) => {
+      console.log("transactionHash", txResponse);
+    })
+    .when("Deposit", "transactionReceipt", (receipt) => {
+      console.log("transactionReceipt", receipt);
+    })
+    .when("Deposit", "error", (error) => {
+      console.log("error", error);
+    });
 
-  // bind a callback to the transactionReceipt event
-  binder.when("Deposit", "transactionReceipt", (receipt) => {
-    console.log("transactionReceipt", receipt);
-  });
-
-  // bind a callback to the error event
-  binder.when("Deposit", "error", (error) => {
-    console.log("error", error);
-  });
-
+  // Override the previous provided transaction method in the bind() method
   await binder.execute("approve", () => {
     // execute some transaction which returns a TransactionResponse
     return contract.approve("0x1", 1);
   });
 
-  // execute the transaction
   await binder.execute("deposit", () => {
     return wallet.sendTransaction({
       to: "0x1",
