@@ -13,7 +13,9 @@ export type PromiseBinderEvents =
   | "error";
 
 // Object which stores the callbacks for each Action name defined by the user
+
 type PromiseBindings = Record<string, PromiseBinderCallbacks>;
+type TransactionBindings = Record<string, () => Promise<TransactionResponse>>;
 
 type TransactionHashCallback = (txHash: TransactionResponse | null) => void;
 type ReceiptCallback = (receipt: TransactionReceipt | null) => void;
@@ -34,6 +36,7 @@ type PromiseBinderCallbacks = {
 
 export interface PromiseBinderActions {
   bindings: PromiseBindings;
+  transactionMethods: TransactionBindings;
   snapshot: Record<string, (args?: unknown) => void>;
 }
 
@@ -41,38 +44,68 @@ export class TxBinder {
   actions: PromiseBinderActions;
 
   constructor() {
-    this.actions = { bindings: {}, snapshot: {} };
+    this.actions = { bindings: {}, transactionMethods: {}, snapshot: {} };
+  }
+
+  // TODO: Allow binding the transaction to an action and executing later
+  bind(name: string, txMethod: () => Promise<TransactionResponse>): TxBinder {
+    // Bind a transaction method to an action name
+    this.actions.transactionMethods[name] = txMethod;
+    return this;
   }
 
   /**
    * Execute a transaction and handle the transactionHash, transactionReceipt and error event callbacks
    * @param name: the name of action
    * @param txMethod An ethers transaction method which returns a TransactionResponse
+   * Overrides the txMethod passed to the bind() method
    * @returns
    */
   async execute(
     name: string,
-    txMethod: () => Promise<TransactionResponse>,
+    txMethod?: () => Promise<TransactionResponse>,
     options?: {
       confirmations?: number;
       timeout?: number;
     }
   ) {
-    try {
-      const txResponse = await txMethod();
-      // If the transactionHash event has been registered, call the associated callback
-      this.actions.bindings[name]?.transactionHash?.(txResponse);
+    // If override tx method is provided, try to execute that instead
+    if (txMethod) {
+      try {
+        const txResponse = await txMethod();
+        // If the transactionHash event has been registered, call the associated callback
+        this.actions.bindings[name]?.transactionHash?.(txResponse);
 
-      // Wait for the transaction to be confirmed
-      const receipt = await txResponse.wait(
-        options?.confirmations,
-        options?.timeout
-      );
-      // If the confirmation event has been registered, call the associated callback
-      this.actions.bindings[name]?.transactionReceipt?.(receipt);
-    } catch (error) {
-      // If an error occurs, call the error callback
-      this.actions.bindings[name]?.error?.(error);
+        // Wait for the transaction to be confirmed
+        const receipt = await txResponse.wait(
+          options?.confirmations,
+          options?.timeout
+        );
+        // If the confirmation event has been registered, call the associated callback
+        this.actions.bindings[name]?.transactionReceipt?.(receipt);
+      } catch (error) {
+        // If an error occurs, call the error callback
+        this.actions.bindings[name]?.error?.(error);
+      }
+    } else {
+      // Default method provided to the bind() method
+      try {
+        // If the transaction method has been registered, try to execute it
+        const txResponse = await this.actions.transactionMethods[name]();
+        // If the transactionHash event has been registered, call the associated callback
+        this.actions.bindings[name]?.transactionHash?.(txResponse);
+
+        // Wait for the transaction to be confirmed
+        const receipt = await txResponse.wait(
+          options?.confirmations,
+          options?.timeout
+        );
+        // If the confirmation event has been registered, call the associated callback
+        this.actions.bindings[name]?.transactionReceipt?.(receipt);
+      } catch (error) {
+        // If an error occurs, call the error callback
+        this.actions.bindings[name]?.error?.(error);
+      }
     }
   }
 
@@ -102,17 +135,17 @@ export class TxBinder {
     action: string,
     event: "transactionHash",
     callback: TransactionHashCallback
-  ): void;
+  ): TxBinder;
 
   // Overload the when method for the 'transactionReceipt' event
   when(
     action: string,
     event: "transactionReceipt",
     callback: ReceiptCallback
-  ): void;
+  ): TxBinder;
 
   // Overload the when method for the 'error' event
-  when(action: string, event: "error", callback: ErrorCallback): void;
+  when(action: string, event: "error", callback: ErrorCallback): TxBinder;
   /**
    *
    * @param name the name of action
@@ -126,7 +159,7 @@ export class TxBinder {
     event: PromiseBinderEvents,
     //TODO: type should be inferred based on the event parameter, currently handled by overloads which is ok but not ideal
     callback: (...args: any[]) => void
-  ) {
+  ): TxBinder {
     if (!this.actions.bindings[name]) {
       this.actions.bindings[name] = {
         transactionHash: undefined,
@@ -135,6 +168,7 @@ export class TxBinder {
       };
     }
     this.actions.bindings[name][event] = callback;
+    return this;
   }
 }
 
