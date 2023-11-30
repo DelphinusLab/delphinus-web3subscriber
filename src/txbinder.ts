@@ -85,9 +85,11 @@ export class TxBinder {
       );
       // If the confirmation event has been registered, call the associated callback
       this.actions.bindings[name]?.transactionReceipt?.(receipt);
+      return receipt;
     } catch (error) {
       // If an error occurs, call the error callback
       this.actions.bindings[name]?.error?.(error);
+      throw error;
     }
   }
 

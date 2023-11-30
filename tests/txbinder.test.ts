@@ -75,23 +75,23 @@ describe("TxBinder", () => {
     });
   });
 
-  //   describe("snapshot", () => {
-  //     it("should call the callback registered with the snapshot name", () => {
-  //       let callback = jest.fn();
-  //       txBinder.register_snapshot("test", callback);
-  //       txBinder.snapshot("test");
-  //       expect(callback).toBeCalled();
-  //     });
+  describe("snapshot callbacks", () => {
+    it("should call the callback registered with the snapshot name", () => {
+      let callback = jest.fn();
+      txBinder.register_snapshot("test", callback);
+      txBinder.snapshot("test");
+      expect(callback).toBeCalled();
+    });
 
-  //     it("should not call the callback registered with a different snapshot name", () => {
-  //       let callback = jest.fn();
-  //       txBinder.register_snapshot("test", callback);
-  //       txBinder.snapshot("test2");
-  //       expect(callback).not.toBeCalled();
-  //     });
-  //   });
+    it("should not call the callback registered with a different snapshot name", () => {
+      let callback = jest.fn();
+      txBinder.register_snapshot("test", callback);
+      txBinder.snapshot("test2");
+      expect(callback).not.toBeCalled();
+    });
+  });
 
-  describe("when", () => {
+  describe("when callbacks", () => {
     it("should call the callback registered with the transactionHash event", async () => {
       let callback = jest.fn();
 
