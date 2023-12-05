@@ -10,7 +10,7 @@ import {
   Wallet,
   TransactionRequest,
 } from "ethers";
-import { DelphinusContract } from "./client.js";
+import { DelphinusContract } from "./client";
 
 export abstract class DelphinusProvider<T extends AbstractProvider> {
   readonly provider: T;

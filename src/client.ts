@@ -4,7 +4,7 @@ import {
   DelphinusBrowserConnector,
   DelphinusReadOnlyConnector,
   DelphinusWalletConnector,
-} from "./provider.js";
+} from "./provider";
 
 export class DelphinusContract {
   private readonly contract: Contract;
