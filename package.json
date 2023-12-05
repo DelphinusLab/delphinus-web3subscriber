@@ -19,6 +19,7 @@
   "bugs": {
     "url": "https://github.com/zoyoeproject/web3subscriber/issues"
   },
+  "type": "module",
   "homepage": "https://github.com/zoyoeproject/web3subscriber#readme",
   "dependencies": {
     "@types/bn.js": "^5.1.0",
