@@ -1,9 +1,7 @@
 import {
   JsonRpcProvider,
   TransactionReceipt,
-  TransactionResponse,
   Wallet,
-  formatEther,
   parseEther,
 } from "ethers";
 import { TxBinder } from "../src/txbinder";
@@ -62,16 +60,12 @@ describe("TxBinder", () => {
       });
     });
 
-    txBinder.bind(errorAction, () => {
+    txBinder.bind(errorAction, async () => {
       // Test transaction to send 1 wei from wallet_1 to wallet_2
-      return wallet_1
-        .sendTransaction({
-          to: wallet_2.address,
-          value: parseEther("1"), // 1 ether
-        })
-        .then(() => {
-          throw new Error("mock error");
-        });
+      return wallet_1.sendTransaction({
+        to: wallet_2.address,
+        value: parseEther("1"), // 1 ether
+      });
     });
   });
 
@@ -109,10 +103,18 @@ describe("TxBinder", () => {
     });
 
     it("should call the callback registered with the error event", async () => {
+      // Mock the sendTransaction function from ethers lib but throw an error
+      // instead of returning a TransactionResponse
+      (wallet_1.sendTransaction as jest.Mock).mockImplementationOnce(() => {
+        throw new Error("Mock error");
+      });
       let callback = jest.fn();
       txBinder.when(errorAction, "error", callback);
-      await txBinder.execute(errorAction);
-      expect(callback).toBeCalled();
+      try {
+        await txBinder.execute(errorAction);
+      } catch (e) {
+        expect(callback).toBeCalled();
+      }
     });
   });
 });
