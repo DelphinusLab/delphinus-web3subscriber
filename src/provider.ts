@@ -1,96 +1,160 @@
-import { HttpProvider, WebsocketProvider, provider } from "web3-core";
-import HDWalletProvider from "@truffle/hdwallet-provider";
-const Web3HttpProvider = require("web3-providers-http");
-const Web3WsProvider = require("web3-providers-ws");
+import {
+  InterfaceAbi,
+  AbstractProvider,
+  WebSocketProvider,
+  JsonRpcProvider,
+  AbstractSigner,
+  Eip1193Provider,
+  BrowserProvider,
+  JsonRpcSigner,
+  Wallet,
+  TransactionRequest,
+} from "ethers";
+import { DelphinusContract } from "./client";
 
-export abstract class DelphinusProvider {
-  provider: provider;
-
-  constructor(prov: provider) {
-    this.provider = prov;
+export abstract class DelphinusProvider<T extends AbstractProvider> {
+  readonly provider: T;
+  constructor(provider: T) {
+    this.provider = provider;
   }
-
-  abstract close(): Promise<void>;
-}
-
-export class DelphinusHttpProvider extends DelphinusProvider {
-  constructor(uri: string) {
-    super(new Web3HttpProvider(uri, DelphinusHttpProvider.getDefaultOptions()));
+  // Subscribe to provider level events such as a new block
+  async subscribeEvent<T>(eventName: string, cb: (event: T) => unknown) {
+    return this.provider.on(eventName, cb);
   }
-
-  static getDefaultOptions() {
-    return {
-      keepAlive: false,
-      timeout: 20000, // milliseconds,
-      withCredentials: false,
-    };
-  }
-
-  async close() {
-    (this.provider as HttpProvider).disconnect();
+  // Read only version of contract
+  getContractWithoutSigner(contractAddress: string, abi: InterfaceAbi) {
+    return new DelphinusContract(contractAddress, abi, this.provider);
   }
 }
 
-export class DelphinusHDWalletProvider extends DelphinusProvider {
-  constructor(privateKey: string, url: string) {
-    super(
-      new HDWalletProvider({
-        privateKeys: [privateKey],
-        providerOrUrl: url,
-        shareNonce: false,
-      })
+// Signer class is to sign transactions from a node client (non-browser environment)
+// Requires private key
+export abstract class DelphinusSigner<T extends AbstractSigner> {
+  readonly signer: T;
+  constructor(signer: T) {
+    this.signer = signer;
+  }
+
+  get provider() {
+    return this.signer.provider;
+  }
+  // Subscribe to provider level events such as a new block
+  async subscribeEvent<T>(eventName: string, cb: (event: T) => unknown) {
+    return this.provider?.on(eventName, cb);
+  }
+
+  // Contract instance with signer attached
+  getContractWithSigner(
+    contractAddress: string,
+    abi: InterfaceAbi
+  ): DelphinusContract {
+    return new DelphinusContract(contractAddress, abi, this.signer);
+  }
+}
+
+// DelphinusBaseProvider is a type alias for WebSocketProvider and JsonRpcProvider
+export type DelphinusBaseProvider = WebSocketProvider | JsonRpcProvider;
+
+// GetBaseProvider is a helper function to get a provider from a url
+export function GetBaseProvider(providerUrl: string) {
+  if (providerUrl.startsWith("ws")) {
+    return new WebSocketProvider(providerUrl);
+  } else {
+    return new JsonRpcProvider(providerUrl);
+  }
+}
+
+// extend window interface for ts to recognize ethereum
+declare global {
+  interface Window {
+    ethereum?: Eip1193Provider;
+  }
+}
+
+// BrowserProvider implementation is exclusively for browser wallets such as MetaMask which implements EIP-1193
+export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider> {
+  constructor() {
+    if (!window.ethereum) {
+      throw "MetaMask not installed, Browser mode is not available.";
+    }
+    // https://eips.ethereum.org/EIPS/eip-1193#summary
+    super(new BrowserProvider(window.ethereum));
+  }
+
+  async connect() {
+    let address = (await this.provider.getSigner()).address;
+    return address;
+  }
+
+  close() {
+    this.provider.destroy();
+  }
+
+  async onAccountChange<T>(cb: (account: string) => T) {
+    this.subscribeEvent("accountsChanged", cb);
+  }
+
+  async getNetworkId() {
+    return (await this.provider.getNetwork()).chainId;
+  }
+  async getJsonRpcSigner(): Promise<JsonRpcSigner> {
+    let signer = await this.provider.getSigner();
+    return signer;
+  }
+  async getContractWithSigner(
+    contractAddress: string,
+    abi: InterfaceAbi
+  ): Promise<DelphinusContract> {
+    return new DelphinusContract(
+      contractAddress,
+      abi,
+      await this.getJsonRpcSigner()
     );
-
-    // TODO: Exit a process is not appropriate since it's a lib!
-    (this.provider as HDWalletProvider).engine.on("error", (err: any) => {
-      console.info("HDWalletProvider connection error, process exiting...");
-      console.log(err);
-      this.close();
-      process.exit(-1);
-    });
   }
 
-  async close() {
-    await (this.provider as any).engine.stop();
+  async switchNet(chainHexId: string) {
+    let id = await this.getNetworkId();
+    let idHex = "0x" + id.toString(16);
+    console.log("switch chain", idHex, chainHexId);
+    if (idHex != chainHexId) {
+      try {
+        await this.provider.send("wallet_switchEthereumChain", [
+          { chainId: chainHexId },
+        ]);
+      } catch (e) {
+        // throw switch chain error to the caller
+        throw e;
+      }
+    }
+  }
+
+  // Wrapper for personal_sign method
+  async sign(message: string): Promise<string> {
+    let signer = await this.provider.getSigner();
+    return await signer.signMessage(message);
   }
 }
 
-export class DelphinusWsProvider extends DelphinusProvider {
-  constructor(uri: string) {
-    super(new Web3WsProvider(uri, DelphinusWsProvider.getDefaultOption()));
+// Read only provider mode for node client (non-browser environment) when no private key is provided
+export class DelphinusReadOnlyConnector extends DelphinusProvider<DelphinusBaseProvider> {
+  constructor(providerUrl: string) {
+    super(GetBaseProvider(providerUrl));
+  }
+}
 
-    // TODO: Exit a process is not appropriate since it's a lib!
-    (this.provider as WebsocketProvider).connection.onerror = () => {
-      console.info("websocket connection error, process exiting...");
-      process.exit(-1);
-    };
+// Wallet Connector is for node client (non-browser environment) with functionality to sign transactions
+export class DelphinusWalletConnector extends DelphinusSigner<Wallet> {
+  constructor(privateKey: string, provider: DelphinusBaseProvider) {
+    super(new Wallet(privateKey, provider));
   }
 
-  static getDefaultOption() {
-    return {
-      timeout: 30000, // ms
-
-      clientConfig: {
-        // Useful if requests are large
-        maxReceivedFrameSize: 100000000, // bytes - default: 1MiB
-        maxReceivedMessageSize: 100000000, // bytes - default: 8MiB
-
-        // Useful to keep a connection alive
-        keepalive: true,
-        keepaliveInterval: 6000, // ms
-      },
-
-      // Enable auto reconnection
-      reconnect: {
-        auto: false,
-        delay: 5000, // ms
-        maxAttempts: 5,
-        onTimeout: true,
-      },
-    };
+  get provider() {
+    // will never be null as we are passing in a provider in the constructor
+    return this.signer.provider!;
   }
 
-  async close() {
-    await (this.provider as WebsocketProvider).connection.close();
+  // Simulate a call to a contract method on the current blockchain state
+  async call(req: TransactionRequest) {
+    return await this.signer.call(req);
   }
 }

@@ -1,34 +1,39 @@
-import Web3 from "web3";
-import { Contract } from "web3-eth-contract";
-import { provider } from "web3-core";
-import detectEthereumProvider from "@metamask/detect-provider";
-import { MetaMaskInpageProvider } from "@metamask/providers";
-import BN from "bn.js";
-
-import { DelphinusProvider } from "./provider";
+import { Contract, Signer, Provider, InterfaceAbi } from "ethers";
+import {
+  DelphinusBaseProvider,
+  DelphinusBrowserConnector,
+  DelphinusReadOnlyConnector,
+  DelphinusWalletConnector,
+} from "./provider";
 
 export class DelphinusContract {
   private readonly contract: Contract;
-  private readonly jsonInterface: any;
-
+  private readonly jsonInterface: InterfaceAbi;
+  /**
+   *
+   * @param jsonInterface
+   * This is the json interface of the contract.
+   * @param contractAddress
+   * This is the address of the contract.
+   * @param signerOrProvider
+   * If signer is provided, the contract will be connected to the signer as
+   * If provider is provided, the contract will be read only.
+   */
   constructor(
-    web3Instance: DelphinusWeb3,
-    jsonInterface: any,
-    address: string,
-    account?: string
+    contractAddress: string,
+    jsonInterface: InterfaceAbi,
+    signerOrProvider?: Signer | Provider
   ) {
     this.jsonInterface = jsonInterface;
 
-    this.contract = new web3Instance.web3Instance.eth.Contract(
-      jsonInterface.abi,
-      address,
-      {
-        from: account || web3Instance.getDefaultAccount(),
-      }
+    this.contract = new Contract(
+      contractAddress,
+      jsonInterface,
+      signerOrProvider
     );
   }
 
-  getWeb3Contract() {
+  getEthersContract() {
     return this.contract;
   }
 
@@ -36,17 +41,17 @@ export class DelphinusContract {
     return this.jsonInterface;
   }
 
+  // Subscribe to events emitted by the contract
+  subscribeEvent<T>(eventName: string, cb: (event: T) => unknown) {
+    return this.contract.on(eventName, cb);
+  }
+
   async getPastEventsFrom(fromBlock: number) {
-    return await this.contract.getPastEvents("allEvents", {
-      fromBlock: fromBlock,
-    });
+    return await this.contract.queryFilter("*", fromBlock);
   }
 
   async getPastEventsFromTo(fromBlock: number, toBlock: number) {
-    return await this.contract.getPastEvents("allEvents", {
-      fromBlock: fromBlock,
-      toBlock: toBlock,
-    });
+    return await this.contract.queryFilter("*", fromBlock, toBlock);
   }
 
   async getPastEventsFromSteped(
@@ -80,217 +85,45 @@ export class DelphinusContract {
     }
     return { events: pastEvents, breakpoint: end };
   }
-
-  address() {
-    return this.contract.options.address;
-  }
 }
 
-export abstract class DelphinusWeb3 {
-  web3Instance: Web3;
-
-  constructor(web3Instance: Web3, close?: (_: provider) => Promise<void>) {
-    this.web3Instance = web3Instance;
-  }
-
-  abstract connect(): Promise<void>;
-  abstract close(): Promise<void>;
-
-  /**
-   * switching the wallet’s active Ethereum chain.
-   */
-  abstract switchNet(
-    chainHexId: string,
-    chainName: string,
-    rpcSource: string,
-    nativeCurrency?: {
-      name: string;
-      symbol: string;
-      decimals: number;
-    },
-    blockExplorer?: string
-  ): Promise<void>;
-
-  async getNetworkId() {
-    return await this.web3Instance.eth.net.getId();
-  }
-
-  getDefaultAccount() {
-    if (this.web3Instance.eth.defaultAccount === null) {
-      throw "DefaultAccount is null";
-    }
-
-    return this.web3Instance.eth.defaultAccount;
-  }
-
-  setDefaultAccount(account: string) {
-    this.web3Instance.eth.defaultAccount = account;
-  }
-
-  async getAccountInfo() {
-    const address = await this.getDefaultAccount();
-    const id = await this.web3Instance.eth.net.getId();
-
-    if (address === null) {
-      throw "Default Account not set";
-    }
-
-    return {
-      address: address,
-      chainId: id.toString(),
-      web3: this.web3Instance,
-    };
-  }
-
-  /**
-   * Creates a new contract instance with all its methods and events
-   * defined in its json interface object.
-   * @constructor
-   * @param {AbiItem[] | AbiItem} jsonInterface - The json interface for the contract to instantiate.
-   * @param {string} address - The address of the smart contract to call.
-   * @param {string} account - The address transactions should be made from.
-   */
-  getContract(jsonInterface: any, address: string, account?: string) {
-    return new DelphinusContract(
-      this,
-      jsonInterface,
-      address,
-      account || this.getDefaultAccount()
-    );
-  }
-}
-
-export class Web3BrowsersMode extends DelphinusWeb3 {
-  provider: MetaMaskInpageProvider;
-
-  constructor() {
-    if (!window.ethereum) {
-      throw "MetaMask not installed, Browser mode is not available.";
-    }
-
-    super(new Web3(window.ethereum as any), undefined);
-    this.provider = window.ethereum as MetaMaskInpageProvider;
-  }
-
-  async connect() {
-    await this.provider.request({ method: "eth_requestAccounts" });
-    let accounts = await this.web3Instance.eth.getAccounts();
-    this.setDefaultAccount(accounts[0]);
-  }
-
-  async close() {}
-
-  async subscribeAccountChange<T>(cb: (account: string) => T) {
-    this.provider.on("accountsChanged", (...accounts: unknown[]) => {
-      cb(accounts[0] as any);
-    });
-  }
-
-  async switchNet(
-    chainHexId: string,
-    chainName: string,
-    rpcSource: string,
-    nativeCurrency?: {
-      name: string;
-      symbol: string;
-      decimals: number;
-    },
-    blockExplorer?: string
-  ) {
-    let id = await this.getNetworkId();
-    let idHex = "0x" + new BN(id).toString(16);
-    console.log("switch chain", idHex, chainHexId);
-    if (idHex != chainHexId) {
-      try {
-        await this.provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: chainHexId }],
-        });
-      } catch (e: any) {
-        if (e.code == 4902) {
-          try {
-            await this.provider.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: chainHexId,
-                  chainName: chainName,
-                  rpcUrls: [rpcSource],
-                  nativeCurrency: nativeCurrency,
-                  blockExplorerUrls: blockExplorer ? [blockExplorer] : null,
-                },
-              ],
-            });
-            await this.provider.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: chainHexId }],
-            });
-          } catch (e) {
-            throw new Error("Add Network Rejected by User.");
-          }
-        } else {
-          throw new Error("Can not switch to chain " + chainHexId);
-        }
-      }
-    }
-    id = await this.getNetworkId();
-    console.log("switched", id, chainHexId);
-  }
-}
-
-export class Web3ProviderMode extends DelphinusWeb3 {
-  readonly monitorAccount: string;
-  readonly delphinusProvider: DelphinusProvider;
-
-  constructor(config: MonitorMode) {
-    super(new Web3(config.provider.provider));
-
-    this.delphinusProvider = config.provider;
-    this.monitorAccount = config.monitorAccount;
-    super.setDefaultAccount(config.monitorAccount);
-  }
-
-  async connect() {}
-
-  async close() {
-    await this.delphinusProvider.close();
-  }
-
-  async switchNet(
-    chainHexId: string,
-    chainName: string,
-    rpcSource: string
-  ): Promise<void> {}
-}
-
-export interface MonitorMode {
-  provider: DelphinusProvider;
-  monitorAccount: string;
-}
-
-async function withDelphinusWeb3<t>(
-  web3: DelphinusWeb3,
-  cb: (web3: DelphinusWeb3) => Promise<t>
+export async function withBrowserConnector<T>(
+  cb: (prov: DelphinusBrowserConnector) => Promise<T>
 ) {
-  await web3.connect();
+  let provider = new DelphinusBrowserConnector();
+
   try {
-    return await cb(web3);
-  } finally {
-    await web3.close();
+    return await cb(provider);
+  } catch (e) {
+    throw e;
   }
 }
 
-export async function withBrowerWeb3<t>(
-  cb: (web3: DelphinusWeb3) => Promise<t>
+// For read-only purposes without private key, we can use a provider to read the blockchain state
+export async function withReadOnlyConnector<T>(
+  cb: (prov: DelphinusReadOnlyConnector) => Promise<T>,
+  providerUrl: string
 ) {
-  let web3 = new Web3BrowsersMode();
-  return await withDelphinusWeb3(web3, cb);
+  let provider = new DelphinusReadOnlyConnector(providerUrl);
+  try {
+    return await cb(provider);
+  } catch (e) {
+    throw e;
+  }
 }
 
-export async function withProviderWeb3<t>(
-  config: MonitorMode,
-  cb: (web3: DelphinusWeb3) => Promise<t>
+// For non browser mode, we need to provide a private key to sign transactions
+// Provider is required to read the blockchain state
+// Wrap ethers wallet implementation to provide a unified interface and necessary methods
+export async function withDelphinusWalletConnector<T>(
+  cb: (prov: DelphinusWalletConnector) => Promise<T>,
+  provider: DelphinusBaseProvider,
+  privateKey: string
 ) {
-  let web3 = new Web3ProviderMode(config);
-  return await withDelphinusWeb3(web3, cb);
+  let wallet = new DelphinusWalletConnector(privateKey, provider);
+  try {
+    return await cb(wallet);
+  } catch (e) {
+    throw e;
+  }
 }

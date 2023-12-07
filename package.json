@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "a web3 subscriber for easy truffle based projects",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest tests/txbinder.test",
     "prepare": "npx tsc"
   },
   "repository": {
@@ -21,15 +21,11 @@
   },
   "homepage": "https://github.com/zoyoeproject/web3subscriber#readme",
   "dependencies": {
-    "@metamask/detect-provider": "^1.2.0",
-    "@metamask/providers": "^8.1.1",
-    "@truffle/hdwallet-provider": "^1.6.0",
     "@types/bn.js": "^5.1.0",
     "bn.js": "^5.2.0",
+    "ethers": "^6.8.1",
     "mongodb": "^4.1.3",
-    "substrate-ss58": "^1.0.3",
-    "web3": "^1.5.3",
-    "web3-providers-http": "^1.6.1"
+    "substrate-ss58": "^1.0.3"
   },
   "devDependencies": {
     "@types/jest": "^26.0.15",
