@@ -78,7 +78,7 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
       throw "MetaMask not installed, Browser mode is not available.";
     }
     // https://eips.ethereum.org/EIPS/eip-1193#summary
-    super(new BrowserProvider(window.ethereum));
+    super(new BrowserProvider(window.ethereum, "any"));
   }
 
   async connect() {
