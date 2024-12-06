@@ -173,4 +173,10 @@ export interface NetworkOptions {
   chainName: string;
   rpcUrls: string[];
   blockExplorerUrls: string[];
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  iconUrls?: string[];
 }
