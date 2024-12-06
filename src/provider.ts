@@ -12,7 +12,7 @@ import {
   EthersError,
 } from "ethers";
 import { DelphinusContract } from "./client";
-import SupportedNetworks from "./networks/supportedNetworks.json";
+import DefaultSupportedNetworks from "./networks/defaultNetworks.json";
 
 export abstract class DelphinusProvider<T extends AbstractProvider> {
   readonly provider: T;
@@ -129,8 +129,7 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
         if (error.code === "UNKNOWN_ERROR") {
           try {
             const networkToAdd =
-              networkOptions ||
-              getSupportedNetworkAsAddNetworkOption(parseInt(chainHexId, 16));
+              networkOptions || findAddNetworkOptions(parseInt(chainHexId, 16));
             if (!networkToAdd) {
               throw new Error("Network not found in supported networks");
             }
@@ -211,12 +210,13 @@ interface SupportedNetwork extends Omit<AddNetworkOptions, "chainId"> {
 }
 
 // Add additional network details to this list. This list will be used to add new networks to wallets.
-export const supportedNetworkList: SupportedNetwork[] = SupportedNetworks;
+const defaultSupportedNetworkList: SupportedNetwork[] =
+  DefaultSupportedNetworks;
 
-export function getSupportedNetworkAsAddNetworkOption(
+export function findAddNetworkOptions(
   chainId: number
 ): AddNetworkOptions | undefined {
-  const network = supportedNetworkList.find(
+  const network = defaultSupportedNetworkList.find(
     (network) => network.chainId === chainId
   );
 
