@@ -1,0 +1,57 @@
+[
+  {
+    "chainId": 1,
+    "chainName": "Ethereum Mainnet",
+    "nativeCurrency": {
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "rpcUrls": ["https://eth.drpc.org"],
+    "blockExplorerUrls": ["https://etherscan.io"]
+  },
+  {
+    "chainId": 97,
+    "chainName": "Binance Smart Chain Testnet",
+    "nativeCurrency": {
+      "name": "Test BNB",
+      "symbol": "tBNB",
+      "decimals": 18
+    },
+    "rpcUrls": ["https://data-seed-prebsc-1-s1.bnbchain.org:8545"],
+    "blockExplorerUrls": ["https://testnet.bscscan.com"]
+  },
+  {
+    "chainId": 5003,
+    "chainName": "Mantle Sepolia Testnet",
+    "nativeCurrency": {
+      "name": "Test Mantle",
+      "symbol": "MNT",
+      "decimals": 18
+    },
+    "rpcUrls": ["https://rpc.sepolia.mantle.xyz"],
+    "blockExplorerUrls": ["https://explorer.sepolia.mantle.xyz"]
+  },
+  {
+    "chainId": 534351,
+    "chainName": "Scroll Sepolia Testnet",
+    "nativeCurrency": {
+      "name": "Scroll Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "rpcUrls": ["https://rpc.ankr.com/scroll_sepolia_testnet"],
+    "blockExplorerUrls": ["https://sepolia.scrollscan.com"]
+  },
+  {
+    "chainId": 11155111,
+    "chainName": "Sepolia",
+    "nativeCurrency": {
+      "name": "Sepolia Ether",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "rpcUrls": ["https://rpc.ankr.com/sepolia"],
+    "blockExplorerUrls": ["https://1rpc.io/sepolia"]
+  }
+]

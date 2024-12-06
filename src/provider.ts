@@ -9,8 +9,10 @@ import {
   JsonRpcSigner,
   Wallet,
   TransactionRequest,
+  EthersError,
 } from "ethers";
 import { DelphinusContract } from "./client";
+import SupportedNetworks from "./networks/supportedNetworks.json";
 
 export abstract class DelphinusProvider<T extends AbstractProvider> {
   readonly provider: T;
@@ -116,7 +118,7 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
     return await this.provider.send("wallet_addEthereumChain", [network]);
   }
 
-  async switchNet(chainHexId: string) {
+  async switchNet(chainHexId: string, networkOptions?: AddNetworkOptions) {
     let id = await this.getNetworkId();
     let idHex = "0x" + id.toString(16);
     console.log("switch chain", idHex, chainHexId);
@@ -126,6 +128,35 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
           { chainId: chainHexId },
         ]);
       } catch (e) {
+        let error = e as EthersError;
+        if (error.code === "UNKNOWN_ERROR") {
+          try {
+            const networkToAdd =
+              networkOptions ||
+              getSupportedNetworkAsAddNetworkOption(parseInt(chainHexId, 16));
+            if (!networkToAdd) {
+              throw new Error("Network not found in supported networks");
+            }
+            await this.provider.send("wallet_addEthereumChain", [networkToAdd]);
+
+            // Retry switching chain
+          } catch (addError) {
+            // Handle "add" error.
+            console.error("add chain error", addError);
+            throw addError;
+          }
+
+          // Retry switching chain
+          try {
+            await this.provider.send("wallet_switchEthereumChain", [
+              { chainId: chainHexId },
+            ]);
+          } catch (switchError) {
+            // throw switch chain error to the caller
+            console.error("switch chain error", switchError);
+            throw switchError;
+          }
+        }
         // throw switch chain error to the caller
         throw e;
       }
@@ -180,4 +211,38 @@ export interface AddNetworkOptions {
     decimals: number;
   };
   iconUrls?: string[];
+}
+
+interface SupportedNetwork extends Omit<AddNetworkOptions, "chainId"> {
+  // Easier to use a number to store the chainId, and  then convert it to a hex string when needed
+  chainId: number;
+}
+
+// Add additional network details to this list. This list will be used to add new networks to wallets.
+export const supportedNetworkList: SupportedNetwork[] = SupportedNetworks;
+
+export function getSupportedNetworkAsAddNetworkOption(
+  chainId: number
+): AddNetworkOptions | undefined {
+  const network = supportedNetworkList.find(
+    (network) => network.chainId === chainId
+  );
+
+  if (network === undefined) {
+    return undefined;
+  }
+
+  return supportedNetworkIntoAddNetworkOptions(network);
+}
+
+export function supportedNetworkIntoAddNetworkOptions(
+  network: SupportedNetwork
+): AddNetworkOptions {
+  return {
+    chainId: "0x" + network.chainId.toString(16),
+    chainName: network.chainName,
+    nativeCurrency: network.nativeCurrency,
+    rpcUrls: network.rpcUrls,
+    blockExplorerUrls: network.blockExplorerUrls,
+  };
 }
