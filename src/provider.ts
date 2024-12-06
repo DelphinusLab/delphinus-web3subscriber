@@ -125,6 +125,7 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
         ]);
       } catch (e) {
         let error = e as EthersError;
+        console.log("err:", error.error);
         if (error.code === "UNKNOWN_ERROR") {
           try {
             const networkToAdd =
@@ -149,13 +150,12 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
             ]);
           } catch (switchError) {
             // throw switch chain error to the caller
-            console.error("switch chain error", switchError);
             throw switchError;
           }
         } else {
+          // throw switch chain error to the caller
           throw e;
         }
-        // throw switch chain error to the caller
       }
     }
   }
