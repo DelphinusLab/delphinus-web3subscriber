@@ -134,8 +134,6 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
               throw new Error("Network not found in supported networks");
             }
             await this.provider.send("wallet_addEthereumChain", [networkToAdd]);
-
-            // Retry switching chain
           } catch (addError) {
             // Handle "add" error.
             console.error("add chain error", addError);
