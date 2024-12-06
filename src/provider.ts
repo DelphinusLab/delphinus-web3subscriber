@@ -9,8 +9,10 @@ import {
   JsonRpcSigner,
   Wallet,
   TransactionRequest,
+  EthersError,
 } from "ethers";
 import { DelphinusContract } from "./client";
+import DefaultSupportedNetworks from "./networks/defaultNetworks.json";
 
 export abstract class DelphinusProvider<T extends AbstractProvider> {
   readonly provider: T;
@@ -112,7 +114,7 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
     );
   }
 
-  async switchNet(chainHexId: string) {
+  async switchNet(chainHexId: string, networkOptions?: AddNetworkOptions) {
     let id = await this.getNetworkId();
     let idHex = "0x" + id.toString(16);
     console.log("switch chain", idHex, chainHexId);
@@ -122,8 +124,35 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
           { chainId: chainHexId },
         ]);
       } catch (e) {
-        // throw switch chain error to the caller
-        throw e;
+        let error = e as EthersError;
+        console.log("err:", error.error);
+        if (error.code === "UNKNOWN_ERROR") {
+          try {
+            const networkToAdd =
+              networkOptions || findAddNetworkOptions(parseInt(chainHexId, 16));
+            if (!networkToAdd) {
+              throw new Error("Network not found in supported networks");
+            }
+            await this.provider.send("wallet_addEthereumChain", [networkToAdd]);
+          } catch (addError) {
+            // Handle "add" error.
+            console.error("add chain error", addError);
+            throw addError;
+          }
+
+          // Retry switching chain
+          try {
+            await this.provider.send("wallet_switchEthereumChain", [
+              { chainId: chainHexId },
+            ]);
+          } catch (switchError) {
+            // throw switch chain error to the caller
+            throw switchError;
+          }
+        } else {
+          // throw switch chain error to the caller
+          throw e;
+        }
       }
     }
   }
@@ -157,4 +186,53 @@ export class DelphinusWalletConnector extends DelphinusSigner<Wallet> {
   async call(req: TransactionRequest) {
     return await this.signer.call(req);
   }
+}
+
+// https://docs.metamask.io/wallet/reference/json-rpc-methods/wallet_addethereumchain/
+export interface AddNetworkOptions {
+  chainId: string; // Should be a hex string with 0x prefix
+  chainName: string;
+  rpcUrls: string[];
+  blockExplorerUrls: string[];
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  iconUrls?: string[];
+}
+
+interface SupportedNetwork extends Omit<AddNetworkOptions, "chainId"> {
+  // Easier to use a number to store the chainId, and  then convert it to a hex string when needed
+  chainId: number;
+}
+
+// Add additional network details to this list. This list will be used to add new networks to wallets.
+const defaultSupportedNetworkList: SupportedNetwork[] =
+  DefaultSupportedNetworks;
+
+export function findAddNetworkOptions(
+  chainId: number
+): AddNetworkOptions | undefined {
+  const network = defaultSupportedNetworkList.find(
+    (network) => network.chainId === chainId
+  );
+
+  if (network === undefined) {
+    return undefined;
+  }
+
+  return supportedNetworkIntoAddNetworkOptions(network);
+}
+
+export function supportedNetworkIntoAddNetworkOptions(
+  network: SupportedNetwork
+): AddNetworkOptions {
+  return {
+    chainId: "0x" + network.chainId.toString(16),
+    chainName: network.chainName,
+    nativeCurrency: network.nativeCurrency,
+    rpcUrls: network.rpcUrls,
+    blockExplorerUrls: network.blockExplorerUrls,
+  };
 }
