@@ -114,10 +114,6 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
     );
   }
 
-  async addNetwork(network: AddNetworkOptions) {
-    return await this.provider.send("wallet_addEthereumChain", [network]);
-  }
-
   async switchNet(chainHexId: string, networkOptions?: AddNetworkOptions) {
     let id = await this.getNetworkId();
     let idHex = "0x" + id.toString(16);
@@ -156,16 +152,12 @@ export class DelphinusBrowserConnector extends DelphinusProvider<BrowserProvider
             console.error("switch chain error", switchError);
             throw switchError;
           }
+        } else {
+          throw e;
         }
         // throw switch chain error to the caller
-        throw e;
       }
     }
-  }
-
-  async addAndSwitchNet(network: AddNetworkOptions) {
-    await this.addNetwork(network);
-    await this.switchNet(network.chainId);
   }
 
   // Wrapper for personal_sign method
