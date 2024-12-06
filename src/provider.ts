@@ -168,8 +168,9 @@ export class DelphinusWalletConnector extends DelphinusSigner<Wallet> {
   }
 }
 
+// https://docs.metamask.io/wallet/reference/json-rpc-methods/wallet_addethereumchain/
 export interface AddNetworkOptions {
-  chainId: string;
+  chainId: string; // Should be a hex string with 0x prefix
   chainName: string;
   rpcUrls: string[];
   blockExplorerUrls: string[];
